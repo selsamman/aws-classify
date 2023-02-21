@@ -1,0 +1,18 @@
+[
+  [
+    "aws-classify-common/src",
+    "aws-classify-server/src/aws-classify-common",
+    "aws-classify-client/src/aws-classify-common",
+    "aws-classify-server/tests/client/aws-classify-common",
+    "aws-classify-server/tests/server/src/aws-classify-common",
+    "aws-classify-server/tests/server/src/aws-classify-server/aws-classify-common"
+  ],
+  [
+    "aws-classify-server/src",
+    "aws-classify-server/tests/server/src/aws-classify-server"
+  ],
+  [
+    "aws-classify-server/tests/client/server-requests",
+    "aws-classify-server/tests/server/src/server-requests"
+  ]
+]

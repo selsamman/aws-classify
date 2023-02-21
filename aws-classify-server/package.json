@@ -1,0 +1,35 @@
+{
+  "name": "aws-classify-server",
+  "version": "0.1.0",
+  "main": "./lib/cjs/index.js",
+  "module": "./lib/esm/index.js",
+  "types": "./lib/esm/index.d.ts",
+  "files": [
+    "/lib"
+  ],
+  "description": "Typescript Interface to Lambda and Websockets",
+  "scripts": {
+    "build": "npm run build:esm && npm run build:cjs",
+    "build:esm": "tsc",
+    "build:cjs": "tsc --module commonjs --outDir lib/cjs"
+  },
+  "repository": "https://github.com/selsamman/aws-classify",
+  "author": "Sam Elsamman",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.103",
+    "@types/node": "^18.8.3",
+    "@typescript-eslint/eslint-plugin": "^5.36.2",
+    "@typescript-eslint/parser": "^5.36.2",
+    "aws-lambda": "^1.0.7",
+    "eslint": "8.22.0",
+    "typescript": "^4.8.2"
+  },
+  "dependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.180.0",
+    "@aws-sdk/client-dynamodb": "^3.168.0",
+    "@aws-sdk/lib-dynamodb": "^3.168.0",
+    "aws-classify-common": "0.1.0",
+    "js-freeze-dry": "^1.1.4"
+  }
+}
