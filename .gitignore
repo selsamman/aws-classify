@@ -2,3 +2,6 @@
 /aws-classify-server/tests/client/node_modules/
 /aws-classify-server/tests/server/node_modules/
 /node_modules/
+.serverless
+.build
+.idea
