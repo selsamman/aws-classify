@@ -5,10 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "npm test",
-    "build:static": "cd ../front-end/ShotCommanderWebApp && npm run build",
-    "debug": "SLS_DEBUG=* node --inspect node_modules/serverless/bin/serverless.js offline -s dev",
-    "deploy:dev": "node_modules/.bin/sls deploy --stage dev",
-    "deploy:prod": "node_modules/.bin/sls deploy --stage prod"
+    "debug": "SLS_DEBUG=* node --inspect node_modules/serverless/bin/serverless.js offline start --stage dev",
+    "start": "sls offline start --stage dev",
+    "install:dynamodb": "sls dynamodb install"
   },
   "author": "Sam Elsamman",
   "license": "ISC",

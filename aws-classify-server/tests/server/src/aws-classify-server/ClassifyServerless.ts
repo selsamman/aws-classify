@@ -184,11 +184,11 @@ export class ClassifyServerless {
 
                     // Post request to the gateway to be sent to src
                     const endpoint = process.env.IS_OFFLINE ? 'http://localhost:3001' :`https://${process.env.APIG_ENDPOINT}`;
-                    if (this.logLevel.calls)
-                        this.log(`creating APIGatewayManagementApiClient for endpoint ${endpoint}`)
+                    if (expressServer.logLevel.calls)
+                        expressServer.log(`creating APIGatewayManagementApiClient for endpoint ${endpoint}`)
                     const client = new ApiGatewayManagementApiClient({endpoint});
-                    if (this.logLevel.data)
-                        this.log(`posting to ${connectionId} ${payload}`);
+                    if (expressServer.logLevel.data)
+                        expressServer.log(`posting to ${connectionId} ${payload}`);
                     const post = new PostToConnectionCommand({
                         ConnectionId: connectionId,
                         Data: Buffer.from(payload)
