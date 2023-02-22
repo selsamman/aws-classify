@@ -119,8 +119,8 @@ export class ClassifyClient {
                 console.log(event)
             });
 
-            this.socket.addEventListener('close',  () => {
-                console.log("socket close");
+            this.socket.addEventListener('close',  event => {
+                console.log(`socket close ${event.code}`);
                 if (this.eventDisconnect)
                     this.eventDisconnect();
                 this.socket = undefined;

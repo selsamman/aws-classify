@@ -1,6 +1,7 @@
 import {ServerRequest} from "../server-requests/ServerRequest";
 import {classifyServerless} from "../aws-classify-server";
 import {ClientRequest} from "../client-requests/ClientRequest";
+import {serializable} from "js-freeze-dry";
 
 // Register request class
 classifyServerless.registerRequest(ClientRequest);
@@ -14,7 +15,7 @@ export class ServerResponse extends ServerRequest {
     async getCount () : Promise<number> { return this.count }
 
     async sendCount () {
-        classifyServerless.createRequest(this, ClientRequest).setCount(this.count);
+        await classifyServerless.createRequest(this, ClientRequest).setCount(this.count);
     }
 
     async getSessionId (): Promise<string> {
@@ -27,3 +28,4 @@ export class ServerResponse extends ServerRequest {
         })
     }
 }
+serializable({ServerResponse})

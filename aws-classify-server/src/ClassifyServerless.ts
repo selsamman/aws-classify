@@ -60,7 +60,7 @@ export class ClassifyServerless {
                 await saveSessionData(sessionId, undefined,undefined, undefined);
             }
             const lambdaResponse : LambdaResponse = {
-                data: `wss://${process.env.APIG_ENDPOINT}`,
+                data: process.env.IS_OFFLINE ? 'ws://localhost:3001' :`wss://${process.env.APIG_ENDPOINT}`,
                 exception: undefined,
                 cargo: undefined,
                 sessionId: sessionId,
@@ -183,11 +183,12 @@ export class ClassifyServerless {
 
 
                     // Post request to the gateway to be sent to src
-                    console.log(`creating APIGatewayManagementApiClient for endpoint ${process.env.APIG_ENDPOINT}`)
-                    const client = new ApiGatewayManagementApiClient({
-                        endpoint: `https://${process.env.APIG_ENDPOINT}`
-                    });
-                    console.log(`posting to ${connectionId} ${payload}`);
+                    const endpoint = process.env.IS_OFFLINE ? 'http://localhost:3001' :`https://${process.env.APIG_ENDPOINT}`;
+                    if (this.logLevel.calls)
+                        this.log(`creating APIGatewayManagementApiClient for endpoint ${endpoint}`)
+                    const client = new ApiGatewayManagementApiClient({endpoint});
+                    if (this.logLevel.data)
+                        this.log(`posting to ${connectionId} ${payload}`);
                     const post = new PostToConnectionCommand({
                         ConnectionId: connectionId,
                         Data: Buffer.from(payload)
@@ -257,13 +258,15 @@ export class ClassifyServerless {
         obj.__sessionId__ = sessionId;
         obj.__connectionId__ = result.connectionId;
 
-        console.log(`creating response for ${interfaceName} with sessionId=${sessionId} connectionId= ${obj.__connectionId__} sessionData=${sessionData}`);
+        if (this.logLevel.calls)
+            this.log(`creating response for ${interfaceName} with sessionId=${sessionId} connectionId= ${obj.__connectionId__} sessionData=${sessionData}`);
 
         const ret : R = await callback(obj as unknown as T);
 
         const updatedSessionData = serialize(obj, classes);
         if (updatedSessionData !== result.sessionData) {
-            console.log(`saving session data for ${interfaceName} with sessionId=${sessionId} connectionId= ${obj.__connectionId__} sessionData=${updatedSessionData}`);
+            if (this.logLevel.calls)
+                this.log(`saving session data for ${interfaceName} with sessionId=${sessionId} connectionId= ${obj.__connectionId__} sessionData=${updatedSessionData}`);
 
             await saveSessionData(sessionId, interfaceName, updatedSessionData, undefined);
         }

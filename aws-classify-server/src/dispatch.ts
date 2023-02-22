@@ -8,6 +8,7 @@ export const classifyServerless = new ClassifyServerless();
 
 export const responseHandler = async (event: APIGatewayProxyEvent, context : Context): Promise<APIGatewayProxyStructuredResultV2> => {
     try {
+        console.log(`dispatching`);
         return {
             statusCode: 200,
             body:  (await classifyServerless.dispatch(event, context)) || "",
@@ -28,6 +29,7 @@ export const responseHandler = async (event: APIGatewayProxyEvent, context : Con
 };
 
 export const webSocketConnect = async (event: APIGatewayProxyEvent, _context : Context): Promise<APIGatewayProxyStructuredResultV2> => {
+    console.log('connecting');
     const sessionId = event.headers['Sec-WebSocket-Protocol'] || "";
     const connectId = event.requestContext.connectionId;
     console.log(JSON.stringify(event));
