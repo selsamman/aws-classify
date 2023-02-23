@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "test": "tsc && jest"
+    "test": "tsc && jest",
+    "start": "cd ../server && npm run start"
   },
   "author": "Sam Elsamman",
   "license": "ISC",

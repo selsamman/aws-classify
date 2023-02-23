@@ -8,14 +8,14 @@ export const classifyServerless = new ClassifyServerless();
 
 export const responseHandler = async (event: APIGatewayProxyEvent, context : Context): Promise<APIGatewayProxyStructuredResultV2> => {
     try {
-        console.log(`dispatching`);
+        //console.log(`dispatching`);
         return {
             statusCode: 200,
             body:  (await classifyServerless.dispatch(event, context)) || "",
         };
     } catch (err : any) {
-        console.log(`request.body = ${event.body}`);
-        console.log(`error = ${err.stack}`);
+        //console.log(`request.body = ${event.body}`);
+        console.log(`error = ${err.message} ${err.stack}`);
         return {
             statusCode: 200,
             body: serialize({
@@ -29,15 +29,15 @@ export const responseHandler = async (event: APIGatewayProxyEvent, context : Con
 };
 
 export const webSocketConnect = async (event: APIGatewayProxyEvent, _context : Context): Promise<APIGatewayProxyStructuredResultV2> => {
-    console.log('connecting');
+    //console.log('connecting');
     const sessionId = event.headers['Sec-WebSocket-Protocol'] || "";
     const connectId = event.requestContext.connectionId;
-    console.log(JSON.stringify(event));
+    //console.log(JSON.stringify(event));
     const result = await getSessionData(sessionId); // Make sure session id passed in is valid
     if (result) {
          // Save connection id
         await saveSessionData(sessionId, undefined,undefined, connectId)
-        console.log(`webSocketConnect session ${sessionId} connected to websocket connectId ${connectId}`);
+        //console.log(`webSocketConnect session ${sessionId} connected to websocket connectId ${connectId}`);
         return {
             statusCode: 200,
             headers: {
@@ -56,8 +56,8 @@ export const webSocketConnect = async (event: APIGatewayProxyEvent, _context : C
     }
 };
 
-export const webSocketDisconnect = async (event: APIGatewayProxyEvent, _context : Context): Promise<APIGatewayProxyStructuredResultV2> => {
-    console.log('Disconnect ' + JSON.stringify(event));
+export const webSocketDisconnect = async (_event: APIGatewayProxyEvent, _context : Context): Promise<APIGatewayProxyStructuredResultV2> => {
+    //console.log('Disconnect ' + JSON.stringify(event));
     //console.log(`webSocketDisconnect sessionId=${sessionId} connectId=${connectId}`);
 
      return {
