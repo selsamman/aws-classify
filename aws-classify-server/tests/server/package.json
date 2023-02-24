@@ -1,14 +1,15 @@
 {
   "name": "aws-ts",
   "version": "1.0.0",
-  "description": "AWS Hello World TS",
+  "description": "Server portion of aws-classify",
   "main": "index.js",
   "scripts": {
     "test": "npm test",
     "debug": "SLS_DEBUG=* node --inspect node_modules/serverless/bin/serverless.js offline start --stage dev",
-    "start": "sls offline start --stage dev",
+    "start": "NO_S3SYNC=true sls offline start --stage dev",
     "install:dynamodb": "sls dynamodb install"
   },
+  "files": ["lib", "yml"],
   "author": "Sam Elsamman",
   "license": "ISC",
   "devDependencies": {

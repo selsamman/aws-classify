@@ -1,0 +1,14 @@
+responseHandler:
+  handler: ${self:custom.directories.responseHandlers}.responseHandler
+  events:
+    - httpApi:
+        path: /api/dispatch
+        method: ANY
+connectHandler:
+  handler: ${self:custom.directories.responseHandlers}.webSocketConnect
+  events:
+    - websocket: $connect
+disconnectHandler:
+  handler: ${self:custom.directories.responseHandlers}.webSocketDisconnect
+  events:
+    - websocket: $disconnect

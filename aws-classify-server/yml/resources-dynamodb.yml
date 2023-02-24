@@ -1,0 +1,15 @@
+Resources:
+  AWSClassifySessionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: classifySessionStore
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: sessionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sessionId
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expires
+        Enabled: true

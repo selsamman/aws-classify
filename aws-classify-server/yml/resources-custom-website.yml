@@ -1,0 +1,80 @@
+Resources:
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Join [ "-", [ "access-identity", !GetAtt S3Bucket.DomainName ] ]
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    DependsOn:
+      - S3Bucket
+    Properties:
+      DistributionConfig:
+        PriceClass: PriceClass_All
+        ViewerCertificate:
+          AcmCertificateArn: ${self:custom.certificateARN}
+          MinimumProtocolVersion: TLSv1.1_2016
+          SslSupportMethod: sni-only
+        Aliases:
+          - ${self:custom.domainName}
+        Enabled: true
+        HttpVersion: http2
+        DefaultRootObject: index.html
+        Origins:
+          - Id: api
+            DomainName: !Join [ ".", [ !Ref HttpApi, "execute-api", !Ref AWS::Region, "amazonaws.com" ] ]
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+          - Id: static
+            DomainName: !GetAtt S3Bucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Join [ "", [ "origin-access-identity/cloudfront/", !Ref CloudFrontOriginAccessIdentity ] ]
+        CacheBehaviors:
+          - PathPattern: api/*
+            TargetOriginId: api
+            # recently deprecated style of setting ForwardedValues
+            # but currently there's no alternative if using CloudFormation
+            ForwardedValues:
+              QueryString: true
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [ GET, HEAD, OPTIONS, PATCH, POST, PUT, DELETE ]
+            # No caching by default but caching can be set with appropriate headers in the api responses
+            MinTTL: 0
+            DefaultTTL: 0
+        DefaultCacheBehavior:
+          TargetOriginId: static
+          # 'Managed-CachingOptimized'
+          # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          # 'Managed-CORS-S3Origin'
+          # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html
+          OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf
+          ViewerProtocolPolicy: redirect-to-https
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: ${self:custom.bucketName}
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: "s3:GetObject"
+            Resource: !Join [ "", [ !GetAtt S3Bucket.Arn, "/*" ] ]
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+  CustomDNSName:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneName: ${self:custom.hostedZoneName}
+      RecordSets:
+        - Name: ${self:custom.domainName}
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2 #cloudfront hostedzone id
+            DNSName:
+              Fn::GetAtt:
+                - CloudFrontDistribution
+                - DomainName

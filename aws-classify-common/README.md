@@ -4,9 +4,13 @@ A library for calling lambda functions as class members. The reverse is also tru
 * Complex data with classes and cyclic structures can be passed and returned
 * Instances of classes that implement methods are created for each session
 * The lambda member functions can also call methods that are implemented in one or more browsers
-* Takes care of complexity in setting up AWS Lambda, S3, DynamoDB for sessions, and Websockets on the AWS Gateway
-* Deployment is fully automated using the Serverless framework
-
+* Eliminates all the complexity of setting up AWS
+## AWS Configuration
+These AWS resources are automatically configured and deployment is fully automated:
+* Lambda Functions with code to wrap your classes
+* Web Sockets using the AWS Gateway
+* Dynamo DB for managing sessions
+* A static website on S3 using Cloudfront with an SSL certificate. 
 ## Installation
 
 On the project that implements the lambda functions
@@ -19,11 +23,13 @@ On the client project
 
 ```npm install aws-classify-common, aws-classify-client```
 
-## Example
+The framework has been tested with popular client software such as Expo for mobile and React Native for web.
 
-### Create a Request on the Client
+## Hello World
 
-First define a request interface (embodied as a class) with a set of methods that are to be implemented on the server.
+### Create a Request for the Client
+
+First define a request class that you will instantiate and call on the client:
 
 ```typescript
 import {reqBody} from "aws-classify-common";

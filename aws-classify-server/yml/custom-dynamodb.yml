@@ -1,0 +1,9 @@
+stages:
+  - dev
+start:
+  port: 8000
+  inMemory: true
+  heapInitial: 200m
+  heapMax: 1g
+  migrate: true
+  convertEmptyValues: true

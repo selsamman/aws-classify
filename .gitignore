@@ -5,3 +5,4 @@
 .serverless
 .build
 .idea
+.dynamodb

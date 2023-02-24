@@ -1,0 +1,7 @@
+Fn::Join:
+  - ""
+  - - Ref: WebsocketsApi
+    - .execute-api.
+    - Ref: AWS::Region
+    - .amazonaws.com/
+    - ${opt:stage, 'dev'}

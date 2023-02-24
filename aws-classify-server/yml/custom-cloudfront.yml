@@ -1,0 +1,3 @@
+- distributionIdKey: CloudFrontId
+  items:
+    - "/*"
