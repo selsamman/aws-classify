@@ -1,12 +1,12 @@
 # aws-classify
 
-A library for calling AWS lambda functions from a browser or react-native app where the lambda functions are implemented as Typescript class members.  You create a request and corresponding response class and aws-classify where the Lambda implementation is in the response class member. When you call the request class member function aws-classify takes care of the magic of invoking the corresponding response class member. 
+A library for calling AWS lambda functions from a browser or react-native app where the lambda functions are implemented as Typescript class members.  You create a request and corresponding response class. When you call the request class member function aws-classify takes care of the magic of invoking the corresponding response class member. 
 
 The reverse is also true in that class members implemented in the browser can be called from the server.The latter uses Web Sockets in the AWS gateway. aws-classify also provides for a static website from which everything can be executed.  
 
 * Complex data with classes and cyclic structures can be passed and returned
+* Execptions are passed back to the caller of the request method
 * Session data is simply a matter of defining fields in the response class
-* Instances of classes that implement methods are created for each session
 * Configuration and deployment via a simple serverless.yml file
 
 ### AWS Resources Configured and Deployed
