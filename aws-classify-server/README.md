@@ -1,16 +1,31 @@
 # aws-classify
 
-A library for calling lambda functions as class members. The reverse is also true in that class members implemented in the browser can be called from the server.  
+A library for calling AWS lambda functions from a browser or react-native app where the lambda functions are implemented as Typescript class members.  You create a request and corresponding response class and aws-classify where the Lambda implementation is in the response class member. When you call the request class member function aws-classify takes care of the magic of invoking the corresponding response class member. 
+
+The reverse is also true in that class members implemented in the browser can be called from the server.The latter uses Web Sockets in the AWS gateway. aws-classify also provides for a static website from which everything can be executed.  
+
 * Complex data with classes and cyclic structures can be passed and returned
+* Session data is simply a matter of defining fields in the response class
 * Instances of classes that implement methods are created for each session
-* The lambda member functions can also call methods that are implemented in one or more browsers
-* Eliminates all the complexity of setting up AWS
-## AWS Configuration
+* Configuration and deployment via a simple serverless.yml file
+
+### AWS Resources Configured and Deployed
 These AWS resources are automatically configured and deployment is fully automated:
-* Lambda Functions with code to wrap your classes
-* Web Sockets using the AWS Gateway
+* AWS Lambda
+* Web Sockets in the AWS Gateway
 * Dynamo DB for managing sessions
-* A static website on S3 using Cloudfront with an SSL certificate. 
+* S3 for a static website
+* Cloudfront with a custom domain name as a CDN
+
+All of these resources are configured by the Serverless Framework and deployed by running a script.  You need to login to AWS in order to:
+
+* Create credentials for the Serverless Framework
+* Register your domain name and create no-cost SSL certificate
+* Occasionally look at Cloudfront logs
+
+### Use Cases
+aws-classify harnesses AWS to make it easy to leverage a scalable cloud-based infrastructure with virtually no learning curve.  From there you can leverage all of the other AWS resources your application may need.  The primary use-case is startups and projects that want a complete "app in a box" solution.
+ 
 ## Installation
 
 On the project that implements the lambda functions
@@ -46,17 +61,17 @@ export class ServerResponse extends ServerRequest {
     async getCount(): Promise<number> {return this.count}
 }
 ```
-Once these classes are registered and instantiated using aws-classify you simply call the request method and the response method is executed as a Lambda function.  Any fields (e.g. count) in the response class are saved and restored between calls and serve as session data.
+Once these classes are registered and instantiated using aws-classify you simply call the request method and the response method is executed as a Lambda function.  Any fields (e.g. count) in the response class are saved and restored between calls and serve as session data.  Request classes must have a unique static interface name field so they are uniquely identified.
 
-Please note:
-* Request classes must have a unique static interface name
-* You must instantiate the request class and invoke its methods like this on the client:
+### Using the Request Class
+
+You instantiate the request class and invoke its methods like this on the client:
 ```typescript
     const classifyClient = new ClassifyClient(getSession, saveSession);
     serverRequest = classifyClient.createRequest(ServerRequest);
     await serverRequest.setCount(2023);
 ```   
-* You implement getSession and saveSession for persisting session data in the local storage
+Since aws-classify is client platform-agnostic you need to implement getSession and saveSession for persisting client session data.  In the browser it would look like this:
 ```typescript
     async function getSession () {
         return localStorage.getItem('ClassifySession') || "None"
@@ -65,22 +80,49 @@ Please note:
         localStorage.setItem('ClassifySession', sessionId);
     }
 ```
-* If the implementation throws an Error it can be caught by wrapping the method call in a try/catch
+If the implementation on the response class throws an Error, the Error will be thrown when you call the request class so it is best to enclose the call in a try/catch:
 ```typescript
     try {
        await serverRequest.setCount(2023);
     } catch (e) { console.log(e) }    
 ```
-
-* On the server you must register the class so it can be instantiated when the client calls. 
-```typeescript
+### Using the Response class
+You must register the class so it can be instantiated when the client calls. Usually this is done in the file where the class is defined: 
+```typescript
     classifyServerless.registerRespon(ServerResponse)
  ```
-* Finally declare the response class as serializable (js-freezedry) so the fields can be saved and restored between calls.
+Because class fields are persisted between calls from the same session, you need to declare the response class as serializable so that js-freezedry can serialize it. Usually this is done in the file where the class is defined:
 ```
     serializable(ServerResponse)
 ```
-### Deployment
+## Project Structure
+The mono repo structure is ideal for projects that use aws-classify as you typically will have a server sub-project and one or more client projects, perhaps mobile and web.  These projects will share code as the request classes must be present in both the client and the server.  The easiest way to accomplish this is using bisync which synchronizes your shared directories automatically.
+
+```
+Root
+- bisync.json (configured to synchronized shared directories)
+- package.json (just for bisync)
+- node_modules (just bisync)
+- cloud
+  - serverless.yml
+  - server-requests (contains request classes implemented on the server)
+  - server-responses (contains implementations on server)
+  - client-requests (contains request classes implented on the client)
+- web (could be a project created with create-react-app)
+  - server-requests (contains request classes implemented on the server) 
+  - client-requests (contains request classes implented on the client)
+  - client-responses (contains implementation on client)
+  - other files pertaining to the client and static website   
+```
+You would then configure bisync.json to keep the shared code in sync
+```
+[
+    ["./cloud/client-requests", "./web/client-requests"],
+    ["./clout/server-requests", "./web/server-requests"]
+]    
+```
+Implementing shared code this way avoid restrictions that packaging schemes have that effectively require code to be present in project tree
+## Deployment
 This serverless.yml file is all you need to configure AWS:
 ```
 service: 'aws-classify-tests'
@@ -163,4 +205,5 @@ resources:
 
 ```
 
+You need to setup your credentials with serverless
 
