@@ -9,22 +9,14 @@ describe("single session tests",  () => {
     let serverRequest : ServerRequest
 
     beforeEach(async () => {
-        await new Promise((resolve, reject) => {
-            try {
-                classifyClient = new ClassifyClient(
-                    async () => session,
-                    async (sessionIn: string) => {
-                        session = sessionIn
-                    },
-                    " http://localhost:4000/api/dispatch");
-                classifyClient.setLogger(msg => console.log(msg));
-                classifyClient.setLogLevel({calls: true});
-                classifyClient.onDisconnect(() => console.log('disconnected'));
-                classifyClient.onConnect(() => resolve(true));
-                classifyClient.initSocket();
-                serverRequest = classifyClient.createRequest(ServerRequest);
-            } catch (e) { reject(e) }
-        });
+        classifyClient = new ClassifyClient(
+            async () => session,
+            async (sessionIn: string) => {
+                session = sessionIn
+            },
+            " http://localhost:4000/api/dispatch");
+        serverRequest = classifyClient.createRequest(ServerRequest);
+        await classifyClient.initSocket();
     });
     afterEach (() => {
         session = "";

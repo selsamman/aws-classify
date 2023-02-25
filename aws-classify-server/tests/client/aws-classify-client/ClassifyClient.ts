@@ -48,10 +48,11 @@ export class ClassifyClient {
         this.listener = listener;
     }
 
-    async initSocket(classes : any = {}) {
+    async initSocket(classes : any = {}) : Promise<boolean>{
 
         if (this.socket || this.socketRequested)
-            return;
+            return true;
+
         this.socketRequested = true;
 
         const request: LambdaRequest = {
@@ -89,15 +90,9 @@ export class ClassifyClient {
             this.socket = new WebSocket(this.webSocketURL, [
                 `${response.sessionId}`
             ]);
-            this.socket.addEventListener('open',  (event) => {
-                console.log("socket open");
-                this.socketRequested = false;
-                if (this.eventConnect)
-                    this.eventConnect();
-                console.log(event)
-            });
+
             this.socket.onerror = error => {
-                console.log(error);
+                this.log(error.toString());
                 this.socket?.close();
             };
 
@@ -109,25 +104,44 @@ export class ClassifyClient {
                     if (callback)
                         callback(request);
                     else
-                        console.log(`unknown websocket request ${methodKey}`);
+                        this.log(`unknown websocket request ${methodKey}`);
                 } catch (e) {
-                    console.log(`${e} on Websocket message parsing`)
+                    this.log(`${e} on Websocket message parsing`)
                 }
             });
 
-            this.socket.addEventListener('error', function (event) {
-                console.log(event)
+            this.socket.addEventListener('error',  (_event) => {
+                this.log('Websocket Error')
             });
 
             this.socket.addEventListener('close',  event => {
-                console.log(`socket close ${event.code}`);
+                this.log(`Websocket closing ${event.code}`);
                 if (this.eventDisconnect)
                     this.eventDisconnect();
                 this.socket = undefined;
             });
+            try {
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => reject('Timed out waiting for socket open'), 5000);
+                    this.socket?.addEventListener('open', (event) => {
+                        this.log("WebSocket open");
+                        this.socketRequested = false;
+                        if (this.eventConnect)
+                            this.eventConnect();
+                        clearTimeout(timeout)
+                        resolve(true);
+                    });
+                });
+            } catch (e : any) {
+                this.log(e.toString());
+                return false;
+            }
+            return true;
         }
-        else
-            console.log('sessionId not returned');
+        else {
+            this.log('sessionId not returned from Lambda');
+            return false;
+        }
     }
 
     createResponse<T>(responseClass : new () => T/*, classes: any = {}*/) : T {

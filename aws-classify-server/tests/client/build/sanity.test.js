@@ -8,22 +8,11 @@ describe("single session tests", () => {
     let session = "";
     let serverRequest;
     beforeEach(async () => {
-        await new Promise((resolve, reject) => {
-            try {
-                classifyClient = new aws_classify_client_1.ClassifyClient(async () => session, async (sessionIn) => {
-                    session = sessionIn;
-                }, " http://localhost:4000/api/dispatch");
-                classifyClient.setLogger(msg => console.log(msg));
-                classifyClient.setLogLevel({ calls: true });
-                classifyClient.onDisconnect(() => console.log('disconnected'));
-                classifyClient.onConnect(() => resolve(true));
-                classifyClient.initSocket();
-                serverRequest = classifyClient.createRequest(ServerRequest_1.ServerRequest);
-            }
-            catch (e) {
-                reject(e);
-            }
-        });
+        classifyClient = new aws_classify_client_1.ClassifyClient(async () => session, async (sessionIn) => {
+            session = sessionIn;
+        }, " http://localhost:4000/api/dispatch");
+        serverRequest = classifyClient.createRequest(ServerRequest_1.ServerRequest);
+        await classifyClient.initSocket();
     });
     afterEach(() => {
         session = "";
