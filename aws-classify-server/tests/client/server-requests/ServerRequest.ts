@@ -7,4 +7,5 @@ export class ServerRequest {
     async sendCount () { reqBody() }
     async getSessionId() : Promise<string> { return reqBody() }
     async sendCountTo(sessionId : string) { reqBody() }
+    async sendOurCountTo(sessionId : string) { reqBody() }
 }

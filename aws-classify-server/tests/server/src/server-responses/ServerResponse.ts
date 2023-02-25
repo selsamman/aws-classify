@@ -15,7 +15,8 @@ export class ServerResponse extends ServerRequest {
     async getCount () : Promise<number> { return this.count }
 
     async sendCount () {
-        await classifyServerless.createRequest(this, ClientRequest).setCount(this.count);
+        const clientRequest = classifyServerless.createRequest(this, ClientRequest);
+        clientRequest.setCount(this.count);
     }
 
     async getSessionId (): Promise<string> {
@@ -24,8 +25,13 @@ export class ServerResponse extends ServerRequest {
 
     async sendCountTo(sessionId: string) {
         await classifyServerless.createResponse(ServerResponse, sessionId, async serverResponse => {
-            await classifyServerless.createRequest(serverResponse, ClientRequest).setCount(this.count);
-        })
+            await serverResponse.sendCount()
+        });
+    }
+
+    async sendOurCountTo(sessionId: string) {
+        const clientRequest = await classifyServerless.createRequestForSession(sessionId, ClientRequest);
+        await clientRequest.setCount(this.count);
     }
 }
 serializable({ServerResponse})

@@ -100,13 +100,23 @@ describe("multi session tests",  () => {
 
         expect (await new Promise( async resolve => {
             clientResponse2.setCount = count => resolve(count);
-            await serverRequest1.sendCountTo(sessionId2);
+            await serverRequest1.sendOurCountTo(sessionId2);
         })).toBe(1);
 
         expect (await new Promise( async resolve => {
             clientResponse1.setCount = count => resolve(count);
-            await serverRequest2.sendCountTo(sessionId1);
+            await serverRequest2.sendOurCountTo(sessionId1);
         })).toBe(2);
+
+        expect (await new Promise( async resolve => {
+            clientResponse2.setCount = count => resolve(count);
+            await serverRequest1.sendCountTo(sessionId2);
+        })).toBe(2);
+
+        expect (await new Promise( async resolve => {
+            clientResponse1.setCount = count => resolve(count);
+            await serverRequest2.sendCountTo(sessionId1);
+        })).toBe(1);
 
     });
 });

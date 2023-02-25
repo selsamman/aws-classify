@@ -40,7 +40,7 @@ On the client project
 
 The framework has been tested with popular client software such as Expo for mobile and React Native for web.
 
-## Hello World
+## Calling Lambda Functions from the Client
 
 ### Create a Request/Response Pair of Classes
 
@@ -95,6 +95,84 @@ Because class fields are persisted between calls from the same session, you need
 ```
     serializable(ServerResponse)
 ```
+## Calling Client Functions from Lambda Functions
+Calling member functions implemented on the client use WebSockets.  There are three distinct use cases:
+* ***Same Session*** - Call a client-request for the same session as the caller of your Lambda function.  
+* ***Alternate Session*** - Instantiate a response class for a different session and then call a client request for that session.  This allows means the response class for the alternate session can change it's session session data
+* ***Direct to Alternate Session*** A shortcut whereby the Lambda fuction directly invokes a request method for an alternate session.
+
+### Setup Requests and Response Classes
+Your Lambda functions can also call requests that will be implemented in the browser.  The class setup is analogous in that you define a request class
+```typescript
+export class ClientRequest {
+    static interfaceName = 'ClientRequest';
+    setCount(count : number) {reqBody()}
+}
+```
+and a response class
+```typescript
+export class ClientResponse extends ClientRequest{
+    count = 0;
+    setCount(count: number) {
+        this.count = 0;
+        console.log(count);
+    }
+}
+```
+On the client you need to instantiate the response class like this:
+```typescript
+    const classifyClient = new ClassifyClient(getSession, saveSession);
+    const clientResponse = classifyClient.createResponse(ClientResponse);
+```
+
+### Implement Lambda Response methods
+In all cases you must register the request class. 
+```typescript
+classifyServerless.registerRequest(ClientRequest);
+```
+For the ***Same Session*** case you instantiate the request object and call the method. The first parameter of **createRequest** is a response object from which the session is to be extracted:
+```typescript
+export class ServerResponse extends ServerRequest {
+    count = 0;
+    // ....
+    async sendCount() {
+        const clientRequest = classifyServerless.createRequest(this, ClientRequest);
+        clientRequest.setCount(this.count);
+    }
+}
+```
+For the ***Alternate Session*** case you first instantiate a response object for the target session and call a method that will invoke a request for the target session:
+```typescript
+ export class ServerResponse extends ServerRequest {
+    count = 0;
+    // ...
+    async sendCountTo(sessionId: string) {
+        await classifyServerless.createResponse(ServerResponse, sessionId, async serverResponse => {
+            await serverResponse.sendCount()
+        });
+    }
+    async sendCount() {
+        const clientRequest = classifyServerless.createRequest(this, ClientRequest);
+        clientRequest.setCount(this.count);
+    }
+    
+}
+```
+
+And for the ***Direct to Alternate Session*** case you may directly instantiate a request object for the target session and invoke its method
+```typescript
+export class ServerResponse extends ServerRequest {
+    count = 0;
+    // ...
+    async sendOurCountTo(sessionId: string) {
+        const clientRequest = await classifyServerless.createRequestForSession(sessionId, ClientRequest);
+        await clientRequest.setCount(this.count);
+    }
+}
+```
+The combination of these use cases allows for a rich set of interactions between code in the cloud and code on the server.  For example:
+* You have two sessions "chat" with other by sharing the session Id
+* You can instantiate and invoke your class methods from any normal Lambda function provided that you have a session.  This includes any of the AWS event mechanisms capable of invoking Lamda functions 
 ## Project Structure
 The mono repo structure is ideal for projects that use aws-classify as you typically will have a server sub-project and one or more client projects, perhaps mobile and web.  These projects will share code as the request classes must be present in both the client and the server.  The easiest way to accomplish this is using bisync which synchronizes your shared directories automatically.
 
@@ -205,5 +283,28 @@ resources:
 
 ```
 
-You need to setup your credentials with serverless
+To deploy you need to:
+- Create AWS credentials using the AWS console as defined in the Serverless [documents](https://www.serverless.com/framework/docs/providers/aws/guide/credentials/documentation)
+- Install and setup credentials You need to setup your credentials with serverless
+```	
+serverless config credentials \
+  --provider aws \
+  --key AKIAIOSFODNN7EXAMPLE \
+  --secret wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+```
+- Obtain a no-cost SSL certificate on the AWS console and put it in the serverless.yml file
+- You can deploy a test version with
+```
+serverless deploy stage dev 
+```
+and a production version with 
+```
+serverless deploy stage prod 
+```
 
+## Roadmap
+* Create some sample applications
+* Continued shakeout with real-world applications
+* Community feedback
+
+At present the library should rightly be considered "beta" until it is more widely adopted.  It is ideal for side projects and proof of concepts.  It is also a useful reference on how to configure AWS services.

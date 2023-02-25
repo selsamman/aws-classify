@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "test": "tsc && jest",
+    "test": "jest",
     "start": "cd ../server && npm run start"
   },
   "author": "Sam Elsamman",
