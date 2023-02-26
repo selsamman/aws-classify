@@ -123,7 +123,7 @@ export class ClassifyClient {
             try {
                 await new Promise((resolve, reject) => {
                     const timeout = setTimeout(() => reject('Timed out waiting for socket open'), 5000);
-                    this.socket?.addEventListener('open', (event) => {
+                    this.socket?.addEventListener('open', (_event) => {
                         this.log("WebSocket open");
                         this.socketRequested = false;
                         if (this.eventConnect)

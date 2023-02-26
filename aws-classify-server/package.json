@@ -1,11 +1,11 @@
 {
   "name": "aws-classify-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
   "types": "./lib/esm/index.d.ts",
   "files": [
-    "/lib"
+    "/lib", "yml"
   ],
   "description": "Typescript Interface to Lambda and Websockets",
   "scripts": {
