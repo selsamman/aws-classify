@@ -9,7 +9,7 @@
   ],
   "description": "Typescript Interface to Lambda and Websockets",
   "scripts": {
-    "build": "tsc",
+    "prepare": "npm run build",
     "build": "npm run build:esm && npm run build:cjs",
     "build:esm": "tsc",
     "build:cjs": "tsc --module commonjs --outDir lib/cjs"

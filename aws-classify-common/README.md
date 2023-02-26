@@ -1,12 +1,12 @@
 # aws-classify
 
-A library for calling AWS lambda functions from a browser or react-native app where the lambda functions are implemented as Typescript class members.  You create a request and corresponding response class. When you call the request class member function aws-classify takes care of the magic of invoking the corresponding response class member. 
+A library for calling AWS lambda functions from a browser or react-native app where the lambda functions are implemented as Typescript class members.  You create a request and corresponding response class. When you call the request class member function aws-classify takes care of the magic of invoking the corresponding response class member as a Lambda function. 
 
-The reverse is also true in that class members implemented in the browser can be called from the server.The latter uses Web Sockets in the AWS gateway. aws-classify also provides for a static website from which everything can be executed.  
+The reverse is also true in that class members implemented in the browser can be called from within a Lambda server. The latter uses Web Sockets in the AWS gateway. aws-classify also provides for a static website from which everything can be executed to comply with same-origin policy.  
 
 * Complex data with classes and cyclic structures can be passed and returned
 * Execptions are passed back to the caller of the request method
-* Session data is simply a matter of defining fields in the response class
+* back-end session data is simply a matter of defining fields in the response class
 * Configuration and deployment via a simple serverless.yml file
 
 ### AWS Resources Configured and Deployed
@@ -17,11 +17,7 @@ These AWS resources are automatically configured and deployment is fully automat
 * S3 for a static website
 * Cloudfront with a custom domain name as a CDN
 
-All of these resources are configured by the Serverless Framework and deployed by running a script.  You need to login to AWS in order to:
-
-* Create credentials for the Serverless Framework
-* Register your domain name and create no-cost SSL certificate
-* Occasionally look at Cloudfront logs
+All of these resources are configured by the Serverless Framework and deployed by running a script.  You only need to login to AWS in order toc reate credentials for the Serverless Framework and to register your domain name and create an SSL certificate.  
 
 ### Use Cases
 aws-classify harnesses AWS to make it easy to leverage a scalable cloud-based infrastructure with virtually no learning curve.  From there you can leverage all of the other AWS resources your application may need.  The primary use-case is startups and projects that want a complete "app in a box" solution.
