@@ -17,7 +17,7 @@ These AWS resources are automatically configured and deployment is fully automat
 * S3 for a static website
 * Cloudfront with a custom domain name as a CDN
 
-All of these resources are configured by the Serverless Framework and deployed by running a script.  You only need to login to AWS in order toc reate credentials for the Serverless Framework and to register your domain name and create an SSL certificate.  
+All of these resources are configured by the Serverless Framework and deployed by running a script.  You only need to login to AWS in order to create credentials for the Serverless Framework and to register your domain name and create an SSL certificate for it.  
 
 ### Use Cases
 aws-classify harnesses AWS to make it easy to leverage a scalable cloud-based infrastructure with virtually no learning curve.  From there you can leverage all of the other AWS resources your application may need.  The primary use-case is startups and projects that want a complete "app in a box" solution.
