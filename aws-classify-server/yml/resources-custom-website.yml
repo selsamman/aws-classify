@@ -78,3 +78,14 @@ Resources:
               Fn::GetAtt:
                 - CloudFrontDistribution
                 - DomainName
+Outputs:
+  CloudFrontId:
+    Description: CloudFront Id
+    Value: !Ref CloudFrontDistribution
+    Export:
+      Name: CloudFrontId
+  WebsiteUrl:
+    Description: Cloudfront URL
+    Value: !GetAtt CloudFrontDistribution.DomainName
+    Export:
+      Name: CloudFrontURL

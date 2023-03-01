@@ -5,7 +5,7 @@ A library for calling AWS lambda functions from a browser or react-native app wh
 The reverse is also true in that class members implemented in the browser can be called from within a Lambda server. The latter uses Web Sockets in the AWS gateway. aws-classify also provides for a static website from which everything can be executed to comply with same-origin policy.  
 
 * Complex data with classes and cyclic structures can be passed and returned
-* Execptions are passed back to the caller of the request method
+* Exceptions are passed back to the caller of the request method
 * back-end session data is simply a matter of defining fields in the response class
 * Configuration and deployment via a simple serverless.yml file
 
@@ -17,7 +17,7 @@ These AWS resources are automatically configured and deployment is fully automat
 * S3 for a static website
 * Cloudfront with a custom domain name as a CDN
 
-All of these resources are configured by the Serverless Framework and deployed by running a script.  You only need to login to AWS in order toc reate credentials for the Serverless Framework and to register your domain name and create an SSL certificate.  
+All of these resources are configured by the Serverless Framework and deployed by running a script.  You only need to login to AWS in order to create credentials for the Serverless Framework and to register your domain name and create an SSL certificate for it.  
 
 ### Use Cases
 aws-classify harnesses AWS to make it easy to leverage a scalable cloud-based infrastructure with virtually no learning curve.  From there you can leverage all of the other AWS resources your application may need.  The primary use-case is startups and projects that want a complete "app in a box" solution.
@@ -197,18 +197,32 @@ You would then configure bisync.json to keep the shared code in sync
 ```
 Implementing shared code this way avoid restrictions that packaging schemes have that effectively require code to be present in project tree
 ## Deployment
-This serverless.yml file is all you need to configure AWS:
+You will need a serverless.yml file for automatic deployment in your cloud folder
+In the first two sections you need to setup these custom variables
+* **service:** - A unique name for your project within your AWS account
+* **domain:** - The domain name your will use(even it is not yet registered)
+* **certificateARN:** - An AWS certificate which you can [generate on the AWS 
+console](https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-request-public.html)
+* **prefixes** - The sub-domain to be used for the development stage.  You may, of course, define other stages (e.g. staging, qa etc)
+* **directories**
+  * **responseHandlers:** - A file that has the exports for the handlers aws-classify needs.  This file should also register your responses.  It looks like this:
+```  
+    export {responseHandler, webSocketConnect, webSocketDisconnect} from "../aws-classify-server"
+    import {classifyServerless} from "aws-classify-server";
+
+    import {ServerResponse} from "./ServerResponse"; // Your server responses
+    classifyServerless.registerResponse(ServerResponse);
 ```
-service: 'aws-classify-tests'
+   * **staticWebsite:** - The directory where your static website will be built
+   * **includeFiles:** - Normally this just points to the yml directory in aws-classify
+```
+service: 'my-fantastic-project'
 
 custom:
 
-  #
-  # You need to fill these out
-  #
-
   # Specify this even if you don't have a custom domain at this time
   domain: awsclassify.com
+  
   # Get your AWS SSL Certificate and put it here if you have a custom domain
   certificateARN: "arn:aws:acm:us-east-1:############:certificate/########-####-####-####-############"
 
@@ -219,19 +233,21 @@ custom:
 
   directories:
     responseHandlers: "src/server-responses/index"
-    staticWebsite: "./static"
-    includeFiles: "node_modules/aws-classify/yml"
-
-  #Include any scripts needed to build your static site
-  #scripts:
-    #hooks:
-    #'before:deploy:deploy': npm run build:static
-
-  #
-  # Boiler plate
-  #
-  yml: "../../yml/"
-  #yml ${self:custom.directories.includeFiles}
+    staticWebsite: "../web/build"
+    includeFiles: "node_modules/aws-classify-serverless/yml"
+```
+If you are using a web site that requires building you will want to force it to be built as part of the deployment by adding the script in the **scripts** custom variable:
+```
+  scripts:
+    hooks:
+    'before:deploy:deploy': npm run build:static
+```
+The remaining custom variables just need to be copied as is.  They will:
+* set up the detailed names for your domain and buckets 
+* configure the s3Sync plugin. Note that noSync: true is specified here so you will have to run ```sls s3Sync``` to push our your site.  Doing this way avoids s3Sync deploying your site when you use offline mode
+* Configures other custom variables needed
+```
+  yml: ${self:custom.directories.includeFiles}
   stage: ${opt:stage,'dev'}
   hostedZoneName: ${self:custom.domain}.
   domainName: ${self:custom.prefixes.${self:custom.stage}}{$self:custome.domain}
@@ -246,16 +262,20 @@ custom:
   serverless-offline:
     httpPort: 4000
   dynamodb: ${file(${self:custom.yml}/custom-dynamodb.yml)}
-
-
+```
+The deployment is dependent on a number plugs which must be installed with npm install
+```
 plugins:
   - serverless-plugin-scripts
   - serverless-s3-sync
+  - "@serverless-aws/serverless-s3-remover"
   - serverless-cloudfront-invalidate
   - serverless-plugin-typescript
   - serverless-dynamodb-local
   - serverless-offline
-
+```
+The provider section details configuration the Serverless Framework handles.  Many of the details are in included files to keep this simple and resiliant to change
+```
 provider:
   name: aws
   runtime: nodejs16.x
@@ -267,16 +287,19 @@ provider:
     APIG_ENDPOINT: ${file(${self:custom.yml}/apig.yml)}
   iam:
     role:
-      - statements:
+      statements:
         - ${file(${self:custom.yml}/provider-iam.yml)}
-
+```
+The functions details each of the Lamda handlers.  The details are in an include file
+```
 functions:
   - ${file(${self:custom.yml}/functions.yml)}
-
+```
+Finally resources contains all of the resource definitions most of which are in include files.  Important:  If you don't yet have a custom domain use ```{file(${self:custom.yml}/resources-website.yml)}``` instead of ```{file(${self:custom.yml}/resources-custom-website.yml)}```
+```
 resources:
-  - ${file(${self:custom.yml}/resources-website.yml)}
-  #  {file(${self:custom.yml}/resources-custom-website.yml)} if you have a custom domain
-
+  - ${file(${self:custom.yml}/resources-custom-website.yml)}
+  - ${file(${self:custom.yml}/resources-dynamodb.yml)}
 ```
 
 To deploy you need to:
@@ -291,13 +314,14 @@ serverless config credentials \
 - Obtain a no-cost SSL certificate on the AWS console and put it in the serverless.yml file
 - You can deploy a test version with
 ```
-serverless deploy stage dev 
+sls deploy --verbose --stage dev
+sls s3sync 
 ```
-and a production version with 
+- Deploy production version with 
 ```
 serverless deploy stage prod 
+sls s3sync 
 ```
-
 ## Roadmap
 * Create some sample applications
 * Continued shakeout with real-world applications

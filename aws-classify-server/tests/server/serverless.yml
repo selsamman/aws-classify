@@ -30,17 +30,17 @@ custom:
   # Boiler plate
   #
   yml: "../../yml/"
-  #yml ${self:custom.directories.includeFiles}
+  #yml: "${self:custom.directories.includeFiles}/"
   stage: ${opt:stage,'dev'}
   hostedZoneName: ${self:custom.domain}.
-  domainName: ${self:custom.prefixes.${self:custom.stage}}{$self:custome.domain}
+  domainName: ${self:custom.prefixes.${self:custom.stage}}${self:custom.domain}
   handler: "src/server-responses/index"
   bucketName: ${self:custom.domainName}
   s3Sync:
     noSync: true
     buckets:
     - bucketName: ${self:custom.bucketName}
-      localDir: ${self:custom.directories.includeFiles}
+      localDir: ${self:custom.directories.staticWebsite}
   cloudfrontInvalidate: ${file(${self:custom.yml}/custom-cloudfront.yml)}
   serverless-offline:
     httpPort: 4000
@@ -74,4 +74,4 @@ functions:
 
 resources:
   - ${file(${self:custom.yml}/resources-website.yml)}
-  #  {file(${self:custom.yml}/resources-custom-website.yml)} if you have a custom domain
+  # ${file(${self:custom.yml}/resources-custom-website.yml)} if you have a custom domain

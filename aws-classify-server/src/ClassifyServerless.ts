@@ -282,7 +282,7 @@ export async function getSessionData (sessionId : string, interfaceName = "") {
             ConsistentRead: true,
             ProjectionExpression: `interface_${interfaceName}, connectionId, updated`
         });
-            return data.Item;
+        return data.Item;
     }
     return undefined;
 }
