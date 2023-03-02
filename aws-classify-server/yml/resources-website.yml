@@ -61,28 +61,10 @@ Resources:
             Resource: !Join ["", [!GetAtt S3Bucket.Arn, "/*"]]
             Principal:
               CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
-  CustomDNSName:
-    Type: AWS::Route53::RecordSetGroup
-    Properties:
-      HostedZoneName: ${self:custom.hostedZoneName}
-      RecordSets:
-        - Name: ${self:custom.domainName}
-          Type: A
-          AliasTarget:
-            HostedZoneId: Z2FDTNDATAQYW2 #cloudfront hostedzone id
-            DNSName:
-              Fn::GetAtt:
-                - CloudFrontDistribution
-                - DomainName
-
 Outputs:
   CloudFrontId:
     Description: CloudFront Id
     Value: !Ref CloudFrontDistribution
-    Export:
-      Name: CloudFrontId
   WebsiteUrl:
     Description: Cloudfront URL
     Value: !GetAtt CloudFrontDistribution.DomainName
-    Export:
-      Name: CloudFrontURL

@@ -11,6 +11,7 @@ module.exports = async () => {
         return;
     });
     global.__SERVERD__ = slsOfflineProcess;
+    process.env.__API__ = 'http://localhost:4000/api/dispatch';
     process.chdir('../client');
 };
 

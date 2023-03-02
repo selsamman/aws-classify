@@ -2,10 +2,12 @@ Resources:
   AWSClassifySessionTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: classifySessionStore
+      TableName: classifySessionStore.${self:custom.domainName}
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
         - AttributeName: sessionId
+          AttributeType: S
+        - AttributeName: userId
           AttributeType: S
       KeySchema:
         - AttributeName: sessionId
@@ -13,3 +15,10 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: expires
         Enabled: true
+      GlobalSecondaryIndexes:
+      - IndexName: userId
+        KeySchema:
+          - AttributeName: userId
+            KeyType: HASH
+        Projection:
+          ProjectionType: KEYS_ONLY

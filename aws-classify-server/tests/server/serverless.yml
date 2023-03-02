@@ -2,35 +2,16 @@ service: 'aws-classify-tests'
 
 custom:
 
-  #
-  # You need to fill these out
-  #
-
-  # Specify this even if you don't have a custom domain at this time
   domain: awsclassify.com
-  # Get your AWS SSL Certificate and put it here if you have a custom domain
   certificateARN: "arn:aws:acm:us-east-1:############:certificate/########-####-####-####-############"
-
-  # Map stages to domain prefixes
   prefixes:
     dev: test.
     prod: ''
-
   directories:
     responseHandlers: "src/server-responses/index"
     staticWebsite: "./static"
     includeFiles: "node_modules/aws-classify/yml"
-
-  #Include any scripts needed to build your static site
-  #scripts:
-    #hooks:
-    #'before:deploy:deploy': npm run build:static
-
-  #
-  # Boiler plate
-  #
   yml: "../../yml/"
-  #yml: "${self:custom.directories.includeFiles}/"
   stage: ${opt:stage,'dev'}
   hostedZoneName: ${self:custom.domain}.
   domainName: ${self:custom.prefixes.${self:custom.stage}}${self:custom.domain}
@@ -72,14 +53,15 @@ provider:
     websocket: true
   environment:
     APIG_ENDPOINT: ${file(${self:custom.yml}/apig.yml)}
+    DOMAIN: ${self:custom.domainName}
   iam:
     role:
-      - statements:
-        - ${file(${self:custom.yml}/provider-iam.yml)}
+      statements:
+      - ${file(${self:custom.yml}/provider-iam.yml)}
 
 functions:
   - ${file(${self:custom.yml}/functions.yml)}
 
 resources:
   - ${file(${self:custom.yml}/resources-website.yml)}
-  # ${file(${self:custom.yml}/resources-custom-website.yml)} if you have a custom domain
+  - ${file(${self:custom.yml}/resources-dynamodb.yml)}

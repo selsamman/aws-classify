@@ -1,9 +1,10 @@
 import {ClassifyClient} from "./aws-classify-client";
-import {after} from "node:test";
 import {ServerRequest} from "./server-requests/ServerRequest";
 import {ClientResponse} from "./client-responses/ClientResponse";
 
 let sessionCount = 0;
+
+console.log(process.env.__testURL__);
 
 describe("single session tests",  () => {
     let classifyClient : ClassifyClient;
@@ -11,12 +12,13 @@ describe("single session tests",  () => {
     let serverRequest : ServerRequest
 
     beforeEach(async () => {
+        console.log(`API Endpoint: ${process.env.__API_}`);
         classifyClient = new ClassifyClient(
             async () => session,
             async (sessionIn: string) => {
                 session = sessionIn
             },
-            " http://localhost:4000/api/dispatch");
+            process.env.__API__);
         serverRequest = classifyClient.createRequest(ServerRequest);
         await classifyClient.initSocket();
         ++sessionCount;
@@ -53,7 +55,7 @@ describe("multi session tests",  () => {
                     async (sessionIn: string) => {
                         session1 = sessionIn
                     },
-                    " http://localhost:4000/api/dispatch");
+                    process.env.__API__);
                 classifyClient1.setLogger(msg => console.log(msg));
                 classifyClient1.setLogLevel({calls: true});
                 classifyClient1.onDisconnect(() => console.log('disconnected'));
@@ -70,7 +72,7 @@ describe("multi session tests",  () => {
                     async (sessionIn: string) => {
                         session2 = sessionIn
                     },
-                    " http://localhost:4000/api/dispatch");
+                    process.env.__API__);
                 classifyClient2.setLogger(msg => console.log(msg));
                 classifyClient2.setLogLevel({calls: true});
                 classifyClient2.onDisconnect(() => console.log('disconnected'));

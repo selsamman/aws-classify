@@ -284,7 +284,7 @@ export class ClassifyServerless {
     async getSessionsForUserId (userId : string) {
         if (userId) {
             const data = await ddbDocClient.query({
-                TableName: 'classifySessionStore',
+                TableName: `classifySessionStore.${process.env.DOMAIN}`,
                 KeyConditionExpression: 'userId = :userId',
                 IndexName: 'userId',
                 ExpressionAttributeValues: {
@@ -300,7 +300,7 @@ export class ClassifyServerless {
 export async function getSessionData (sessionId : string, interfaceName = "") {
     if (sessionId) {
         const data = await ddbDocClient.get({
-            TableName: 'classifySessionStore',
+            TableName: `classifySessionStore.${process.env.DOMAIN}`,
             Key: { sessionId },
             ConsistentRead: true,
             ProjectionExpression: `interface_${interfaceName}, connectionId, userId, updated`
@@ -329,7 +329,7 @@ export async function saveSessionData(sessionId : string, interfaceName? : strin
 
         // First try and out data only if the session id exists
         await ddbDocClient.update({
-            TableName: 'classifySessionStore',
+            TableName: `classifySessionStore.${process.env.DOMAIN}`,
             Key: { sessionId },
             UpdateExpression: `set ${updateExpressionComponents.join(", ")}`,
             ExpressionAttributeValues: expressionAttributeValues

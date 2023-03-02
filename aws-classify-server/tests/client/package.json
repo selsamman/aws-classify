@@ -1,6 +1,7 @@
 {
   "scripts": {
     "test": "jest",
+    "test:online": "jest --config jest.config.online.js",
     "start": "cd ../server && npm run start"
   },
   "author": "Sam Elsamman",
