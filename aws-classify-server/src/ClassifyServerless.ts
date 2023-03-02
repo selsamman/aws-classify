@@ -119,7 +119,7 @@ export class ClassifyServerless {
 
             const updatedSessionData = serialize(obj, classes);
             if (!result || updatedSessionData !== result.sessionData)
-                sessionId  = await saveSessionData(sessionId, request.interfaceName, updatedSessionData, undefined);
+                sessionId  = await saveSessionData(sessionId, request.interfaceName, updatedSessionData, undefined, obj.__userId__);
 
             // Formulate response
             const lambdaResponse : LambdaResponse = {
@@ -216,6 +216,13 @@ export class ClassifyServerless {
             throw Error('ClassifyServerless.getSessionId: no session id');
         return sessionId;
     }
+    getUserId<T>(responseObj : T) {
+        const userId = responseObj['__userId__'];
+        return userId;
+    }
+    setUserId<T>(responseObj : T, userId : string){
+        responseObj['__userId__'] = userId;
+    }
 
     createRequest<T, U>(responseObj : U, requestClass : new () => T) : T {
         const obj = new requestClass();
@@ -257,6 +264,7 @@ export class ClassifyServerless {
             Object.assign(obj, deserialize(sessionData, classes));
         obj.__sessionId__ = sessionId;
         obj.__connectionId__ = result.connectionId;
+        obj.__userId__ = result.userId;
 
         if (this.logLevel.calls)
             this.log(`creating response for ${interfaceName} with sessionId=${sessionId} connectionId= ${obj.__connectionId__} sessionData=${sessionData}`);
@@ -273,6 +281,21 @@ export class ClassifyServerless {
 
         return ret;
     }
+    async getSessionsForUserId (userId : string) {
+        if (userId) {
+            const data = await ddbDocClient.query({
+                TableName: 'classifySessionStore',
+                KeyConditionExpression: 'userId = :userId',
+                IndexName: 'userId',
+                ExpressionAttributeValues: {
+                    ':userId': userId,
+                },
+                ProjectionExpression: `sessionId`
+            });
+            return data.Items ? data.Items.map(i => i.sessionId) : [];
+        }
+        return [];
+    }
 }
 export async function getSessionData (sessionId : string, interfaceName = "") {
     if (sessionId) {
@@ -280,13 +303,14 @@ export async function getSessionData (sessionId : string, interfaceName = "") {
             TableName: 'classifySessionStore',
             Key: { sessionId },
             ConsistentRead: true,
-            ProjectionExpression: `interface_${interfaceName}, connectionId, updated`
+            ProjectionExpression: `interface_${interfaceName}, connectionId, userId, updated`
         });
         return data.Item;
     }
     return undefined;
 }
-export async function saveSessionData(sessionId : string, interfaceName? : string, sessionData? : string, connectionId?: string) {
+
+export async function saveSessionData(sessionId : string, interfaceName? : string, sessionData? : string, connectionId?: string, userId?: string) {
 
         const updateExpressionComponents = ['updated = :time'];
         const expressionAttributeValues = {':time' : new Date().getTime()};
@@ -297,6 +321,10 @@ export async function saveSessionData(sessionId : string, interfaceName? : strin
         if (connectionId) {
             updateExpressionComponents.push('connectionId = :connectionId');
             expressionAttributeValues[':connectionId'] = connectionId;
+        }
+        if (userId) {
+            updateExpressionComponents.push('userId = :userId');
+            expressionAttributeValues[':userId'] = userId;
         }
 
         // First try and out data only if the session id exists

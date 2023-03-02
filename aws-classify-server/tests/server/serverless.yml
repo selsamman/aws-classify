@@ -44,7 +44,15 @@ custom:
   cloudfrontInvalidate: ${file(${self:custom.yml}/custom-cloudfront.yml)}
   serverless-offline:
     httpPort: 4000
-  dynamodb: ${file(${self:custom.yml}/custom-dynamodb.yml)}
+  dynamodb:
+    stages:
+      - dev
+    start:
+      port: 8000
+      inMemory: true
+      heapInitial: 200m
+      heapMax: 1g
+      convertEmptyValues: true
 
 
 plugins:

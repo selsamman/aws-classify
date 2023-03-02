@@ -10,6 +10,11 @@ export class ServerResponse extends ServerRequest {
 
     count = 0;
 
+    constructor() {
+        super();
+        classifyServerless.setUserId(this, 'all');
+    }
+
     async setCount (count : number) { this.count = count }
 
     async getCount () : Promise<number> { return this.count }
@@ -21,6 +26,9 @@ export class ServerResponse extends ServerRequest {
 
     async getSessionId (): Promise<string> {
         return await classifyServerless.getSessionId(this);
+    }
+    async getSessions () : Promise<Array<string>> {
+        return await classifyServerless.getSessionsForUserId('all');
     }
 
     async sendCountTo(sessionId: string) {

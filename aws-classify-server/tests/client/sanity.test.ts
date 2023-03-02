@@ -3,6 +3,8 @@ import {after} from "node:test";
 import {ServerRequest} from "./server-requests/ServerRequest";
 import {ClientResponse} from "./client-responses/ClientResponse";
 
+let sessionCount = 0;
+
 describe("single session tests",  () => {
     let classifyClient : ClassifyClient;
     let session = "";
@@ -17,6 +19,7 @@ describe("single session tests",  () => {
             " http://localhost:4000/api/dispatch");
         serverRequest = classifyClient.createRequest(ServerRequest);
         await classifyClient.initSocket();
+        ++sessionCount;
     });
     afterEach (() => {
         session = "";
@@ -59,6 +62,7 @@ describe("multi session tests",  () => {
                 serverRequest1 = classifyClient1.createRequest(ServerRequest);
             } catch (e) { reject(e) }
         });
+        ++sessionCount;
         await new Promise((resolve, reject) => {
             try {
                 classifyClient2 = new ClassifyClient(
@@ -75,6 +79,7 @@ describe("multi session tests",  () => {
                 serverRequest2 = classifyClient2.createRequest(ServerRequest);
             } catch (e) { reject(e) }
         });
+        ++sessionCount;
     });
     afterEach (() => {
         session1 = "";
@@ -118,5 +123,14 @@ describe("multi session tests",  () => {
             await serverRequest2.sendCountTo(sessionId1);
         })).toBe(1);
 
+        const sessions = await serverRequest1.getSessions();
+        console.log(sessions.join(",") + sessionId1 + sessionId2);
+        //expect(sessions.length).toBe(sessionCount);
+        //expect (sessions[0]).toBe(sessionId2);
+        //expect (sessions[1]).toBe(sessionId1);
+        expect(sessions.includes(sessionId1)).toBe(true);
+        expect(sessions.includes(sessionId2)).toBe(true);
+
     });
+
 });
