@@ -274,7 +274,7 @@ plugins:
   - serverless-dynamodb-local
   - serverless-offline
 ```
-The provider section details configuration the Serverless Framework handles.  Many of the details are in included files to keep this simple and resiliant to change
+The provider section details configuration the Serverless Framework handles.  Many of the details are in included files to keep this simple and resilient to change
 ```
 provider:
   name: aws
@@ -285,6 +285,7 @@ provider:
     websocket: true
   environment:
     APIG_ENDPOINT: ${file(${self:custom.yml}/apig.yml)}
+    DOMAIN: ${self:custom.domainName}
   iam:
     role:
       statements:

@@ -4,8 +4,47 @@ import {ClientResponse} from "./client-responses/ClientResponse";
 
 let sessionCount = 0;
 
-console.log(process.env.__testURL__);
+beforeAll( async () => {
+    let session = "";
+    const classifyClient = new ClassifyClient(
+        async () => session,
+        async (sessionIn: string) => {
+            session = sessionIn
+        },
+        process.env.__API__);
+    const serverRequest = classifyClient.createRequest(ServerRequest);
+    await serverRequest.clearSessions();
+    ++sessionCount;
+});
 
+console.log(process.env.__testURL__);
+describe("work without WebSockets",  () => {
+    let classifyClient : ClassifyClient;
+    let session = "";
+    let serverRequest : ServerRequest
+
+    beforeEach(async () => {
+        console.log(`API Endpoint: ${process.env.__API_}`);
+        classifyClient = new ClassifyClient(
+            async () => session,
+            async (sessionIn: string) => {
+                session = sessionIn
+            },
+            process.env.__API__);
+        serverRequest = classifyClient.createRequest(ServerRequest);
+        ++sessionCount;
+    });
+    afterEach (() => {
+        session = "";
+        classifyClient = undefined as unknown as ClassifyClient;
+    });
+    it ( "can get/set the count", async () => {
+        await serverRequest.setCount(5);
+        expect((await serverRequest.getSessionId()).length > 10).toBe(true);
+        expect(await serverRequest.getCount()).toBe(5);
+    });
+
+});
 describe("single session tests",  () => {
     let classifyClient : ClassifyClient;
     let session = "";
@@ -101,6 +140,8 @@ describe("multi session tests",  () => {
         const clientResponse2 = classifyClient2.createResponse(ClientResponse);
         const sessionId1 = await serverRequest1.getSessionId();
         const sessionId2 = await serverRequest2.getSessionId();
+        await serverRequest1.setUserId('1');
+        await serverRequest2.setUserId('2');
         expect(sessionId1 !== sessionId2).toBe(true);
         await serverRequest1.setCount(1);
         await serverRequest2.setCount(2);
@@ -127,12 +168,28 @@ describe("multi session tests",  () => {
 
         const sessions = await serverRequest1.getSessions();
         console.log(sessions.join(",") + sessionId1 + sessionId2);
-        //expect(sessions.length).toBe(sessionCount);
-        //expect (sessions[0]).toBe(sessionId2);
-        //expect (sessions[1]).toBe(sessionId1);
+        expect(sessions.length).toBe(sessionCount);
         expect(sessions.includes(sessionId1)).toBe(true);
         expect(sessions.includes(sessionId2)).toBe(true);
 
+        const sessions1 = await serverRequest1.getSessionsForUser('1');
+        expect(sessions1.length).toBe(1);
+        expect(sessions1[0]).toBe(sessionId1);
+
+        const sessions2 = await serverRequest1.getSessionsForUser('2');
+        expect(sessions2.length).toBe(1);
+        expect(sessions2[0]).toBe(sessionId2);
+
+        await serverRequest1.clearSessionsForUser('2');
+
+        const sessions3 = await serverRequest1.getSessions();
+        console.log(sessions2.join(",") + sessionId1 + sessionId2);
+        expect(sessions3.length).toBe(sessionCount - 1);
+        expect(sessions3.includes(sessionId1)).toBe(true);
+        expect(sessions3.includes(sessionId2)).toBe(false);
+
+        await serverRequest1.clearSessions();
+        expect((await serverRequest1.getSessions()).length).toBe(1);
     });
 
 });

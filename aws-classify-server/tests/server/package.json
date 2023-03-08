@@ -6,7 +6,8 @@
   "scripts": {
     "test": "npm test",
     "debug": "SLS_DEBUG=* node --inspect node_modules/serverless/bin/serverless.js offline start --stage dev",
-    "start": "NO_S3SYNC=true sls offline start --stage dev",
+    "start": "sls offline start --stage dev",
+    "deploy": "sls deploy --stage dev",
     "install:dynamodb": "sls dynamodb install"
   },
   "files": ["lib", "yml"],

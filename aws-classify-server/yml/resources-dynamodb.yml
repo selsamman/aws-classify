@@ -22,3 +22,5 @@ Resources:
             KeyType: HASH
         Projection:
           ProjectionType: KEYS_ONLY
+      StreamSpecification:
+        StreamViewType: ${self:custom.SessionStreamViewType, 'NEW_IMAGE'}

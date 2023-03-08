@@ -15,8 +15,13 @@ export class ClassifyServerless {
     logLevel: Partial<typeof EndPointsLogging> = {};
     classDefs : Map<any, ClassDef<any, any>> = new Map();
     requests : Map<any, any> = new Map();
+    expirationMinutes = 60 * 24;
 
     log : (_message: string) => void = msg => console.log(msg);
+
+    setExpirationMinutes(minutes : number) {
+        this.expirationMinutes = minutes;
+    }
 
     setLogger(log : (_message: string) => void) {
         this.log = log;
@@ -57,7 +62,7 @@ export class ClassifyServerless {
             const socketResult = await getSessionData(sessionId, "");
             if (!socketResult) {
                 sessionId = context.awsRequestId;
-                await saveSessionData(sessionId, undefined,undefined, undefined);
+                await saveSessionData(sessionId, undefined,undefined, undefined, undefined, this.expirationMinutes);
             }
             const lambdaResponse : LambdaResponse = {
                 data: process.env.IS_OFFLINE ? 'ws://localhost:3001' :`wss://${process.env.APIG_ENDPOINT}`,
@@ -119,7 +124,7 @@ export class ClassifyServerless {
 
             const updatedSessionData = serialize(obj, classes);
             if (!result || updatedSessionData !== result.sessionData)
-                sessionId  = await saveSessionData(sessionId, request.interfaceName, updatedSessionData, undefined, obj.__userId__);
+                sessionId  = await saveSessionData(sessionId, request.interfaceName, updatedSessionData, undefined, obj.__userId__, this.expirationMinutes);
 
             // Formulate response
             const lambdaResponse : LambdaResponse = {
@@ -200,7 +205,7 @@ export class ClassifyServerless {
 
                     if (expressServer.logLevel.exceptions)
                         expressServer.log(e.message as string);
-                    throw e;
+                    throw new Error(`Unable to send message via Websocket ${e.message}`);
                 }
             }
             if (this.logLevel.create)
@@ -272,18 +277,18 @@ export class ClassifyServerless {
         const ret : R = await callback(obj as unknown as T);
 
         const updatedSessionData = serialize(obj, classes);
-        if (updatedSessionData !== result.sessionData) {
+        if (updatedSessionData !== result.sessionData || Math.floor(Date.now() / 1000 / 60) !== result.expires / 60) {
             if (this.logLevel.calls)
                 this.log(`saving session data for ${interfaceName} with sessionId=${sessionId} connectionId= ${obj.__connectionId__} sessionData=${updatedSessionData}`);
 
-            await saveSessionData(sessionId, interfaceName, updatedSessionData, undefined);
+            await saveSessionData(sessionId, interfaceName, updatedSessionData, undefined, undefined, this.expirationMinutes);
         }
 
         return ret;
     }
     async getSessionsForUserId (userId : string) {
         if (userId) {
-            const data = await ddbDocClient.query({
+             const data = await ddbDocClient.query({
                 TableName: `classifySessionStore.${process.env.DOMAIN}`,
                 KeyConditionExpression: 'userId = :userId',
                 IndexName: 'userId',
@@ -296,32 +301,82 @@ export class ClassifyServerless {
         }
         return [];
     }
+    async getSessions () {  // For unit testing
+         const data = await ddbDocClient.scan({
+            TableName: `classifySessionStore.${process.env.DOMAIN}`,
+            ProjectionExpression: `sessionId`
+        });
+        return data.Items ? data.Items.map(i => i.sessionId) : [];
+    }
+    async deleteSessionsForUserId (userId : string) {
+        if (userId) {
+            const data = await ddbDocClient.query({
+                TableName: `classifySessionStore.${process.env.DOMAIN}`,
+                KeyConditionExpression: 'userId = :userId',
+                IndexName: 'userId',
+                ExpressionAttributeValues: {
+                    ':userId': userId,
+                },
+                ProjectionExpression: `sessionId`
+            });
+            const keys = data.Items ? data.Items.map(i => i.sessionId) : [];
+            await deleteSessionByKeys(keys);
+        }
+    }
+    async deleteSessions () {
+        const data = await ddbDocClient.scan({
+            TableName: `classifySessionStore.${process.env.DOMAIN}`,
+            ProjectionExpression: `sessionId`
+        });
+        const keys =  data.Items ? data.Items.map(i => i.sessionId) : [];
+        await deleteSessionByKeys(keys);
+    }
 }
+async function deleteSessionByKeys (keys : Array<string>) {
+    for (let ix = 0; ix < keys.length; ++ix) {
+        await ddbDocClient.delete({
+            TableName: `classifySessionStore.${process.env.DOMAIN}`,
+            Key: {sessionId: keys[ix]}
+        });
+    }
+}
+
 export async function getSessionData (sessionId : string, interfaceName = "") {
     if (sessionId) {
         const data = await ddbDocClient.get({
             TableName: `classifySessionStore.${process.env.DOMAIN}`,
             Key: { sessionId },
             ConsistentRead: true,
-            ProjectionExpression: `interface_${interfaceName}, connectionId, userId, updated`
+            ProjectionExpression: `interface_${interfaceName}, connectionId, userId, updated, expires`
         });
         return data.Item;
     }
     return undefined;
 }
 
-export async function saveSessionData(sessionId : string, interfaceName? : string, sessionData? : string, connectionId?: string, userId?: string) {
+export async function saveSessionData(sessionId : string, interfaceName? : string, sessionData? : string, connectionId?: string, userId?: string, expirationMinutes?: number) {
+
 
         const updateExpressionComponents = ['updated = :time'];
         const expressionAttributeValues = {':time' : new Date().getTime()};
+
+        if (typeof expirationMinutes === 'number') {
+            const expires = new Date();
+            expires.setMinutes(expires.getMinutes() + expirationMinutes);
+            updateExpressionComponents.push('expires = :expires');
+            expressionAttributeValues[':expires'] = expires.getTime() / 1000;
+        }
+
         if (sessionData && interfaceName) {
             updateExpressionComponents.push(`interface_${interfaceName} = :data`);
             expressionAttributeValues[`:data`] = sessionData;
         }
+
         if (connectionId) {
             updateExpressionComponents.push('connectionId = :connectionId');
             expressionAttributeValues[':connectionId'] = connectionId;
         }
+
         if (userId) {
             updateExpressionComponents.push('userId = :userId');
             expressionAttributeValues[':userId'] = userId;

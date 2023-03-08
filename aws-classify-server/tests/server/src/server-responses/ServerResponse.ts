@@ -27,8 +27,20 @@ export class ServerResponse extends ServerRequest {
     async getSessionId (): Promise<string> {
         return await classifyServerless.getSessionId(this);
     }
+    async getSessionsForUser (user : string) : Promise<Array<string>> {
+        return await classifyServerless.getSessionsForUserId(user);
+    }
     async getSessions () : Promise<Array<string>> {
-        return await classifyServerless.getSessionsForUserId('all');
+        return await classifyServerless.getSessions();
+    }
+    async clearSessionsForUser (user : string) {
+         await classifyServerless.deleteSessionsForUserId(user);
+    }
+    async clearSessions () {
+        await classifyServerless.deleteSessions();
+    }
+    async setUserId(userId : string) {
+        classifyServerless.setUserId(this, userId);
     }
 
     async sendCountTo(sessionId: string) {
