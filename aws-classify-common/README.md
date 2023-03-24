@@ -35,6 +35,9 @@ On the client project
 ```npm install aws-classify-common, aws-classify-client```
 
 The framework has been tested with popular client software such as Expo for mobile and React Native for web.
+## Kicking the Tires
+
+Because aws-classify involves multiple sub-projects (web, mobile, aws back-end) the best way to get started is to fork or checkout this sample [chat application](https://github.com/selsamman/aws-classify-example-simple-chat) that contains some simple Lambda response classes and a mobile/web front-end. 
 
 ## Calling Lambda Functions from the Client
 
@@ -179,20 +182,17 @@ Root
 - node_modules (just bisync)
 - cloud
   - serverless.yml
-  - server-requests (contains request classes implemented on the server)
-  - server-responses (contains implementations on server)
-  - client-requests (contains request classes implented on the client)
+  - requests (request classes)
+  - responses (contains implementations of requests from client)
 - web (could be a project created with create-react-app)
-  - server-requests (contains request classes implemented on the server) 
-  - client-requests (contains request classes implented on the client)
-  - client-responses (contains implementation on client)
+  - requests (requests) 
+  - responses (contains implementation of requests from the server)
   - other files pertaining to the client and static website   
 ```
 You would then configure bisync.json to keep the shared code in sync
 ```
 [
-    ["./cloud/client-requests", "./web/client-requests"],
-    ["./clout/server-requests", "./web/server-requests"]
+    ["./cloud/requests", "./web/requests"],
 ]    
 ```
 Implementing shared code this way avoid restrictions that packaging schemes have that effectively require code to be present in project tree
@@ -304,7 +304,7 @@ resources:
 ```
 
 To deploy you need to:
-- Create AWS credentials using the AWS console as defined in the Serverless [documents](https://www.serverless.com/framework/docs/providers/aws/guide/credentials/documentation)
+- Create AWS credentials using the AWS console as defined in the Serverless [documents](https://www.serverless.com/framework/docs/providers/aws/guide/credentials)
 - Install and setup credentials You need to setup your credentials with serverless
 ```	
 serverless config credentials \
@@ -324,7 +324,7 @@ serverless deploy stage prod
 sls s3sync 
 ```
 ## Roadmap
-* Create some sample applications
+* Create template/scripts for getting started
 * Continued shakeout with real-world applications
 * Community feedback
 

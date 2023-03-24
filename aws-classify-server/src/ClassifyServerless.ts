@@ -10,6 +10,8 @@ import {ClassifyResponse} from "./ClassifyResponse";
 const ddbClient = new DynamoDBClient({ region: process.env.DD_REGION, endpoint: process.env.DD_ENDPOINT });
 const ddbDocClient = DynamoDBDocument.from(ddbClient);
 
+const updateDebounceInterval = 1000 * 60 * 10; // Don't update session unless 10 minutes have passed or data changed
+
 export class ClassifyServerless {
 
     logLevel: Partial<typeof EndPointsLogging> = {};
@@ -91,13 +93,16 @@ export class ClassifyServerless {
             const obj = new classDef.serverClass() as ClassifyResponse;
 
             // Retrieve session data from DynamoDB base on sessionId in request
+            let orignalSessionData = "";
             const result = await getSessionData(sessionId, request.interfaceName);
             if (!result)
                 sessionId = context.awsRequestId;
             else {
                 const sessionData = result[`interface_${request.interfaceName}`];
-                if (sessionData) // Enrich it with session data
-                    Object.assign(obj, deserialize(sessionData, classes));
+                if (sessionData) {// Enrich it with session data
+                    orignalSessionData = deserialize(sessionData, classes)
+                    Object.assign(obj, orignalSessionData);
+                }
             }
 
             obj.__sessionId__  = sessionId;
@@ -123,7 +128,7 @@ export class ClassifyServerless {
             }
 
             const updatedSessionData = serialize(obj, classes);
-            if (!result || updatedSessionData !== result.sessionData)
+            if (!result || updatedSessionData !== orignalSessionData  || (Date.now() > (result.updated + updateDebounceInterval)))
                 sessionId  = await saveSessionData(sessionId, request.interfaceName, updatedSessionData, undefined, obj.__userId__, this.expirationMinutes);
 
             // Formulate response
@@ -277,7 +282,7 @@ export class ClassifyServerless {
         const ret : R = await callback(obj as unknown as T);
 
         const updatedSessionData = serialize(obj, classes);
-        if (updatedSessionData !== result.sessionData || Math.floor(Date.now() / 1000 / 60) !== result.expires / 60) {
+        if (updatedSessionData !== sessionData || (Date.now() > (result.updated + updateDebounceInterval))) {
             if (this.logLevel.calls)
                 this.log(`saving session data for ${interfaceName} with sessionId=${sessionId} connectionId= ${obj.__connectionId__} sessionData=${updatedSessionData}`);
 
@@ -364,7 +369,7 @@ export async function saveSessionData(sessionId : string, interfaceName? : strin
             const expires = new Date();
             expires.setMinutes(expires.getMinutes() + expirationMinutes);
             updateExpressionComponents.push('expires = :expires');
-            expressionAttributeValues[':expires'] = expires.getTime() / 1000;
+            expressionAttributeValues[':expires'] = Math.floor(expires.getTime() / 1000);
         }
 
         if (sessionData && interfaceName) {
