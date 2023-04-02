@@ -323,8 +323,13 @@ sls s3sync
 serverless deploy stage prod 
 sls s3sync 
 ```
+## Limitations
+* AWS Websockets are limited to 10 minutes
+* No locking mechanism for simultaneous lambda function execution which could cause sessions to be over-ridden with the last one to complete
+* The session key is not periodically updated as the actual database key is used
+* No mechanism to have session alternatives to DynamoDB (for example, REDIS, JWT)
 ## Roadmap
-* Create template/scripts for getting started
+* Create template/scripts for getting started (currently starting with chat) sample app is the easiest way to use this library.
 * Continued shakeout with real-world applications
 * Community feedback
 

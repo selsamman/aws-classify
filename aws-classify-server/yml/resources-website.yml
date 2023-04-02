@@ -46,6 +46,11 @@ Resources:
           # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html
           OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf
           ViewerProtocolPolicy: redirect-to-https
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 1
+            ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: "/"
   S3Bucket:
     Type: AWS::S3::Bucket
     Properties:

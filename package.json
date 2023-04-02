@@ -1,5 +1,5 @@
 {
   "devDependencies": {
-    "bisync": "^0.9.7"
+    "bisync": "^0.9.8"
   }
 }
