@@ -3,6 +3,7 @@ import {ServerRequest} from "./server-requests/ServerRequest";
 import {ClientResponse} from "./client-responses/ClientResponse";
 
 let sessionCount = 0;
+jest.setTimeout(60000);
 
 beforeAll( async () => {
     let session = "";

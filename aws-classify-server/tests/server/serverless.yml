@@ -41,7 +41,7 @@ plugins:
   - serverless-s3-sync
   - serverless-cloudfront-invalidate
   - serverless-plugin-typescript
-  - serverless-dynamodb-local
+  - serverless-dynamodb
   - serverless-offline
 
 provider:
