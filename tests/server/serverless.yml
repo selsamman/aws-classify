@@ -1,23 +1,18 @@
-service: 'aws-classify-tests'
+service: aws-classify-tests-${param:suffix, 'local'}
 frameworkVersion: '4'
 
 custom:
 
-  domain: awsclassify.com
-  certificateARN: "arn:aws:acm:us-east-1:############:certificate/########-####-####-####-############"
-  prefixes:
-    dev: test.
-    prod: ''
   directories:
     responseHandlers: "src/server-responses/index"
     staticWebsite: "./static"
     includeFiles: "../../aws-classify-server/yml"
   yml: ${self:custom.directories.includeFiles}
   stage: ${opt:stage,'dev'}
-  hostedZoneName: ${self:custom.domain}.
-  domainName: ${self:custom.prefixes.${self:custom.stage}}${self:custom.domain}
+  # DOMAIN is the framework's session-store namespace; no DNS zone is needed.
+  domainName: ${self:service}
   handler: "src/server-responses/index"
-  bucketName: ${self:custom.domainName}
+  bucketName: ${param:contentBucket, self:service}
   serverless-offline:
     host: 127.0.0.1
     httpPort: 4000
@@ -32,7 +27,9 @@ plugins:
 provider:
   name: aws
   runtime: nodejs22.x
-  region: us-east-1
+  region: ${opt:region, 'us-east-1'}
+  deploymentBucket:
+    name: ${param:deploymentBucket, 'aws-classify-tests-local-artifacts'}
   websocketsApiRouteSelectionExpression: $request.body.action
   logs:
     websocket: true
@@ -50,3 +47,17 @@ functions:
 resources:
   - ${file(${self:custom.yml}/resources-website.yml)}
   - ${file(${self:custom.yml}/resources-dynamodb.yml)}
+  - Outputs:
+      TestApiUrl:
+        Value:
+          Fn::Join: ['', [Fn::GetAtt: [HttpApi, ApiEndpoint], '/api/dispatch']]
+      TestWebSocketUrl:
+        Value:
+          Fn::Join:
+            - ''
+            - - 'wss://'
+              - ${file(${self:custom.yml}/apig.yml)}
+      TestContentBucket:
+        Value: !Ref S3Bucket
+      TestSessionTable:
+        Value: !Ref AWSClassifySessionTable

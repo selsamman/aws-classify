@@ -151,7 +151,7 @@ async function startOffline(options = {}) {
             ...options.env,
         };
         process.on('exit', forceCleanup);
-        const database = launch('Dynalite', process.execPath, [require.resolve('dynalite/cli.js'),
+        const database = launch('Dynalite', options.databaseCommand ?? process.execPath, options.databaseArgs ?? [require.resolve('dynalite/cli.js'),
             '--host', host, '--port', String(ports.dynamodb)], env);
         await waitForPorts(database, [ports.dynamodb]);
 

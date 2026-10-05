@@ -8,7 +8,9 @@
     "start": "cd ../server && npm run start",
     "pretest": "npm --prefix ../.. run build",
     "pretest:online": "npm --prefix ../.. run build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:unit": "jest --config jest.config.unit.js",
+    "pretest:unit": "npm --prefix ../.. run build"
   },
   "author": "Sam Elsamman",
   "license": "ISC",
@@ -18,14 +20,16 @@
     "@types/node": "^18.8.3",
     "@typescript-eslint/eslint-plugin": "^8.71.0",
     "@typescript-eslint/parser": "^8.71.0",
+    "axios": "^1.20.0",
     "eslint": "^8.57.1",
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
+    "js-freeze-dry": "^1.1.5",
     "ts-jest": "^29.4.14",
     "typescript": "^4.9.5"
   },
   "dependencies": {
-    "aws-classify-client": "0.1.0",
-    "@aws-classify-tests/requests": "0.1.0"
+    "@aws-classify-tests/requests": "0.1.0",
+    "aws-classify-client": "0.1.0"
   }
 }

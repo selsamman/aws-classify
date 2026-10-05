@@ -1,4 +1,4 @@
-import {ServerRequest} from "@aws-classify-tests/requests";
+import {ServerRequest, TestPayload} from "@aws-classify-tests/requests";
 import {classifyServerless} from "aws-classify-server";
 import {ClientRequest} from "@aws-classify-tests/requests";
 import {serializable} from "js-freeze-dry";
@@ -9,6 +9,15 @@ classifyServerless.registerRequest(ClientRequest);
 export class ServerResponse extends ServerRequest {
 
     count = 0;
+    payload = new TestPayload();
+    async fail() { this.count = -1; throw new Error('fixture failure'); }
+    async deniedSetCount(count: number) { this.count = count; }
+    async echo(payload: TestPayload, extra: unknown) { return [payload, extra]; }
+    async setPayload(payload: TestPayload) { this.payload = payload; }
+    async getPayload() { return this.payload; }
+    async sendPayload() {
+        await classifyServerless.createRequest(this, ClientRequest).setPayload(this.payload);
+    }
 
     constructor() {
         super();
@@ -21,7 +30,7 @@ export class ServerResponse extends ServerRequest {
 
     async sendCount () {
         const clientRequest = classifyServerless.createRequest(this, ClientRequest);
-        clientRequest.setCount(this.count);
+        await clientRequest.setCount(this.count);
     }
 
     async getSessionId (): Promise<string> {

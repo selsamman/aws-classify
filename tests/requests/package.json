@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "aws-classify-common": "0.1.0"
+    "aws-classify-common": "0.1.0",
+    "js-freeze-dry": "^1.1.5"
   },
   "devDependencies": {
     "typescript": "^4.9.5"

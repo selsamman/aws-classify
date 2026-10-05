@@ -55,92 +55,97 @@ export class ClassifyClient {
 
         this.socketRequested = true;
 
-        const request: LambdaRequest = {
-            interfaceName: '$WebSocket',
-            methodName: '$authorize',
-            args: [],
-            sessionId: await this.getSession()
-        };
-        const body = serialize(request);
-
-        if (this.logLevel.calls)
-            this.log(`Endpoint ${request.interfaceName}.${request.methodName} requesting`);
-
-        // Make requests and parse response
-        this.log(`contacting ${this.postURL}`);
-        const rawResponse = await axios.post(
-            this.postURL,
-            body,
-            {
-                headers: {'Content-Type': 'text/plain'},
-                transformRequest: [],
-                transformResponse: []
-            }
-        );
-
-        const response: LambdaResponse = deserialize(rawResponse.data, classes as LambdaResponse);
-        if (response.sessionId) {
-
-            this.webSocketURL = response.data;
-            this.setSession(response.sessionId);
+        try {
+            const request: LambdaRequest = {
+                interfaceName: '$WebSocket',
+                methodName: '$authorize',
+                args: [],
+                sessionId: await this.getSession()
+            };
+            const body = serialize(request);
 
             if (this.logLevel.calls)
-                this.log(`Endpoint ${request.interfaceName}.${request.methodName} responded`);
+                this.log(`Endpoint ${request.interfaceName}.${request.methodName} requesting`);
 
-            this.socket = new WebSocket(this.webSocketURL, [
-                `${response.sessionId}`
-            ]);
-
-            this.socket.onerror = error => {
-                this.log(error.toString());
-                this.socket?.close();
-            };
-
-            this.socket.addEventListener('message', (ev: MessageEvent) => {
-                try {
-                    const request = deserialize(ev.data, classes) as LambdaRequest;
-                    const methodKey = `${request.interfaceName}.${request.methodName}`;
-                    const callback = this.messageCallback[methodKey];
-                    if (callback)
-                        callback(request);
-                    else
-                        this.log(`unknown websocket request ${methodKey}`);
-                } catch (e) {
-                    this.log(`${e} on Websocket message parsing`)
+            // Make requests and parse response
+            this.log(`contacting ${this.postURL}`);
+            const rawResponse = await axios.post(
+                this.postURL,
+                body,
+                {
+                    headers: {'Content-Type': 'text/plain'},
+                    transformRequest: [],
+                    transformResponse: []
                 }
-            });
+            );
 
-            this.socket.addEventListener('error',  (_event) => {
-                this.log('Websocket Error')
-            });
+            const response: LambdaResponse = deserialize(rawResponse.data, classes as LambdaResponse);
+            if (response.sessionId) {
 
-            this.socket.addEventListener('close',  event => {
-                this.log(`Websocket closing ${event.code}`);
-                if (this.eventDisconnect)
-                    this.eventDisconnect();
-                this.socket = undefined;
-            });
-            try {
-                await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => reject('Timed out waiting for socket open'), 5000);
-                    this.socket?.addEventListener('open', (_event) => {
-                        this.log("WebSocket open");
-                        this.socketRequested = false;
-                        if (this.eventConnect)
-                            this.eventConnect();
-                        clearTimeout(timeout)
-                        resolve(true);
-                    });
+                this.webSocketURL = response.data;
+                this.setSession(response.sessionId);
+
+                if (this.logLevel.calls)
+                    this.log(`Endpoint ${request.interfaceName}.${request.methodName} responded`);
+
+                this.socket = new WebSocket(this.webSocketURL, [
+                    `${response.sessionId}`
+                ]);
+
+                this.socket.onerror = error => {
+                    this.log(error.toString());
+                    this.socket?.close();
+                };
+
+                this.socket.addEventListener('message', (ev: MessageEvent) => {
+                    try {
+                        const request = deserialize(ev.data, classes) as LambdaRequest;
+                        const methodKey = `${request.interfaceName}.${request.methodName}`;
+                        const callback = this.messageCallback[methodKey];
+                        if (callback)
+                            callback(request);
+                        else
+                            this.log(`unknown websocket request ${methodKey}`);
+                    } catch (e) {
+                        this.log(`${e} on Websocket message parsing`)
+                    }
                 });
-            } catch (e : any) {
-                this.log(e.toString());
+
+                this.socket.addEventListener('error',  (_event) => {
+                    this.log('Websocket Error')
+                });
+
+                this.socket.addEventListener('close',  event => {
+                    this.log(`Websocket closing ${event.code}`);
+                    if (this.eventDisconnect)
+                        this.eventDisconnect();
+                    this.socket = undefined;
+                });
+                try {
+                    await new Promise((resolve, reject) => {
+                        const timeout = setTimeout(() => reject('Timed out waiting for socket open'), 5000);
+                        this.socket?.addEventListener('open', (_event) => {
+                            this.log("WebSocket open");
+                            this.socketRequested = false;
+                            if (this.eventConnect)
+                                this.eventConnect();
+                            clearTimeout(timeout)
+                            resolve(true);
+                        });
+                    });
+                } catch (e : any) {
+                    this.log(e.toString());
+                    return false;
+                }
+                return true;
+            }
+            else {
+                this.log('sessionId not returned from Lambda');
                 return false;
             }
-            return true;
-        }
-        else {
-            this.log('sessionId not returned from Lambda');
-            return false;
+        } finally {
+            // A failed authorization/open attempt must permit another attempt.
+            this.socketRequested = false;
         }
     }
 

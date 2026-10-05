@@ -5,14 +5,13 @@
   "main": "index.js",
   "scripts": {
     "test": "npm test --workspace @aws-classify-tests/client",
-    "test:harness": "node --test offline.test.js",
+    "test:harness": "node --test offline.test.js aws-test.test.js",
     "typecheck": "tsc --noEmit",
     "debug": "node offline.js --debug",
     "start": "node offline.js",
-    "deploy": "serverless deploy --stage dev",
     "prestart": "npm --prefix ../.. run build",
     "predebug": "npm --prefix ../.. run build",
-    "predeploy": "npm --prefix ../.. run build"
+    "test:aws": "node aws-test.js"
   },
   "files": [
     "lib",
@@ -25,16 +24,21 @@
     "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^8.71.0",
     "@typescript-eslint/parser": "^8.71.0",
+    "dynalite": "^4.0.0",
     "eslint": "^8.57.1",
-    "serverless-offline": "^14.8.2",
-    "typescript": "^5.9.3",
     "serverless": "^4.43.0",
-    "dynalite": "^4.0.0"
+    "serverless-offline": "^14.8.2",
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "aws-classify-server": "0.1.9",
     "@aws-classify-tests/requests": "0.1.0",
+    "@aws-sdk/client-cloudformation": "^3.1146.0",
+    "@aws-sdk/client-cloudfront": "^3.1146.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.1146.0",
     "@aws-sdk/client-dynamodb": "^3.1146.0",
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/client-sts": "^3.1146.0",
+    "aws-classify-server": "0.1.9",
     "js-freeze-dry": "^1.1.4"
   },
   "private": true,

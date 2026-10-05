@@ -4,3 +4,6 @@ node_modules/
 .build
 .idea
 .dynamodb
+
+# Disposable AWS validation reports and deployment packages
+.test-results/

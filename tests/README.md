@@ -50,7 +50,9 @@ before service teardown. Local session data is discarded on each run.
 The harness regression suite uses real Dynalite and a small fake Serverless
 executable to exercise startup errors, partial startup, timeouts, cancellation,
 occupied ports, restart, and termination of unresponsive subprocesses. It does
-not require Serverless sign-in.
+not require Serverless sign-in. It also checks malformed/incomplete resolved
+configuration and database startup failure. AWS-runner regression tests verify
+cleanup ownership guards and correct handling of retained deleted-stack records.
 
 For a manually running offline backend:
 
@@ -63,10 +65,84 @@ npm run debug --workspace @aws-classify-tests/server
 Stop it with Ctrl-C before running the integration tests. The same startup and
 shutdown code is used for both manual runs and Jest.
 
-For tests against the deployed test service, set `WebsiteURL` to its website URL
-and run `npm run test:online --workspace @aws-classify-tests/client`. That suite
-resets the deployed service's test sessions; deploy the fixture explicitly with
-`npm run deploy --workspace @aws-classify-tests/server` when needed.
+## Coverage
+
+The default suite covers session persistence and isolation, multiple interfaces,
+registered-class serialization, malformed/unknown requests, member failures and
+recovery, authorization-hook denial, user-index reassignment and deletion,
+callback routing, missing recipients/connections, and socket close/reconnect.
+Each behavior test resets its own fixture data; callback waits have deadlines
+and sockets close after failures as well as success. Index assertions poll reads
+for up to ten seconds to accommodate real DynamoDB consistency.
+
+Focused unit tests cover transport and database failures, callback send errors,
+authorization denial before invocation/database access, expiry timestamps, and
+socket initialization failure/retry. These use controlled mocks; they do not
+validate AWS authentication. To run only these checks without starting services:
+
+```sh
+npm run test:unit --workspace @aws-classify-tests/client
+```
+
+## Disposable AWS validation
+
+From the repository root:
+
+```sh
+npm run test:aws
+# Optional personal prefix, AWS profile and region:
+npm run test:aws -- --suffix sam --profile review --region us-east-1
+```
+
+This requires working AWS credentials and the normal Serverless 4 sign-in.
+The AWS CLI is not required: the runner uses the AWS SDK's credential chain.
+`--suffix` accepts a 1–10 character lowercase prefix starting with a letter.
+Every run adds a timestamp and random component, producing a service such as
+`aws-classify-tests-sam-<run-id>`. Concurrent reviewers can use the same profile
+or prefix: stacks, tables, content buckets and deployment buckets remain unique.
+The default region is `AWS_REGION`, or `us-east-1` when it is unset; stage is `dev`.
+
+The command builds the libraries, reports its AWS caller identity, creates a
+private deployment bucket, packages and checks IAM, deploys the fixture, uploads
+static content, and runs the same 23 behavior cases through direct API Gateway
+and default CloudFront. Both runs use real WebSockets. It also verifies the
+uploaded website, configured DynamoDB TTL and saved expiry values. It does not
+wait for TTL deletion. No custom domain, hosted zone or certificate is required.
+
+The fixture incurs normal AWS charges while it exists. Creating/removing it
+requires permissions for its CloudFormation, IAM, Lambda, API Gateway, DynamoDB,
+S3 and CloudFront resources; diagnostics also read CloudWatch logs. API Gateway's
+account-level logging role may require Serverless's account setup permissions.
+The test creates synthetic data only and deletes it afterward.
+
+Results, revision information, stack outputs/events and Lambda diagnostics are
+saved under `.test-results/aws/<service>/`. The runner empties its content bucket
+and removes its owned stack and deployment bucket in a finally path, including
+after partial deployment or Ctrl-C. It refuses to reuse an existing stack or
+remove resources from a different recorded account. Cleanup failures fail the
+command independently of test results and print a recovery command:
+
+```sh
+npm run test:aws -- --cleanup /absolute/path/to/.test-results/aws/<service>/run.json
+```
+
+A forced process kill or machine shutdown cannot run cleanup; use that command
+with the saved report. The runner keeps its artifacts bucket if stack deletion
+fails so recovery can inspect/retry the deployment. Serverless may create shared
+account-level infrastructure (for example, an API Gateway logging role); the
+runner does not delete shared resources used by other services.
+
+To target an already deployed **test fixture** explicitly:
+
+```sh
+TestAPIURL=https://<api-id>.execute-api.<region>.amazonaws.com/api/dispatch \
+  npm run test:online --workspace @aws-classify-tests/client
+# Or WebsiteURL=https://<distribution>.cloudfront.net
+```
+
+This manual command resets that fixture's sessions. It does not deploy or remove
+resources. Never point it at an application or production table. The default
+AWS command always creates a disposable fixture instead.
 
 ## Security checks
 
@@ -87,3 +163,10 @@ used by this code.
 
 Jest 30 and TypeScript ESLint 8 remove the vulnerable `braces` dependency from
 the test and lint tools.
+
+## Planned test and authentication work
+
+The [authentication feature request](../docs/FEATURE_REQUEST_AUTHENTICATION.md)
+records the baseline test/deployment work and the planned provider-neutral
+authentication and secure WebSocket support. Authentication remains follow-up
+work; the current fixture exercises the existing session protocol.

@@ -16,6 +16,8 @@ const { spawn } = require('node:child_process');
 const mode = process.env.HARNESS_MODE;
 if (process.argv.includes('print')) {
     if (mode === 'config-failure') { console.error('configuration broke'); process.exit(2); }
+    if (mode === 'config-malformed') { console.log('{broken'); process.exit(0); }
+    if (mode === 'config-incomplete') { console.log('{}'); process.exit(0); }
     if (mode === 'config-timeout') { setInterval(() => {}, 1000); }
     else console.log(JSON.stringify({
         TableName: 'classifySessionStore.test.awsclassify.com',
@@ -99,6 +101,8 @@ test('starts without log matching, creates the indexed session table, stops, and
 
 for (const [mode, message] of [
     ['config-failure', /configuration broke/],
+    ['config-malformed', /JSON/],
+    ['config-incomplete', /missing its name or key schema/],
     ['config-timeout', /Timed out starting Serverless configuration/],
     ['offline-failure', /offline broke/],
     ['partial-start', /Timed out starting Serverless Offline/],
@@ -142,5 +146,13 @@ test('cancels startup and cleans up services', async () => {
     const timer = setTimeout(() => controller.abort(), 1000);
     try { await assert.rejects(startOffline(settings), { name: 'AbortError' }); }
     finally { clearTimeout(timer); }
+    await assertReleased(settings.ports);
+});
+
+test('cleans up when the database process dies during startup', async () => {
+    const settings = await options('normal');
+    settings.databaseCommand = process.execPath;
+    settings.databaseArgs = ['-e', "console.error('database broke'); process.exit(7)"];
+    await assert.rejects(startOffline(settings), /Dynalite failed.*7[\s\S]*database broke/);
     await assertReleased(settings.ports);
 });
