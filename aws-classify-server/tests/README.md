@@ -7,9 +7,13 @@ The library packages do not require Serverless at runtime.
 From the repository root:
 
 ```sh
+npm ci --ignore-scripts
 npm run install:tests
 npm test
 ```
+
+The root install supplies the source synchronization tool used by its regression
+test. `--ignore-scripts` avoids starting the source watcher automatically.
 
 Serverless Framework 4 requires its normal sign-in or a configured access/license
 key. To sign in, run `npx serverless login` from
@@ -17,8 +21,9 @@ key. To sign in, run `npx serverless login` from
 installation, DynamoDB download, or real AWS credentials are needed for offline
 requests. The harness supplies dummy AWS credentials to its subprocesses.
 
-`npm test` runs the harness regression tests, then the browser client integration
-suite. To run either separately:
+`npm test` runs the source synchronization regression test, the harness regression
+tests, and the browser client integration suite. The client suite uses Jest 30.
+To run the harness or integration tests separately:
 
 ```sh
 npm --prefix aws-classify-server/tests/server run test:harness
@@ -58,3 +63,29 @@ For tests against the deployed test service, set `WebsiteURL` to its website URL
 and run `npm --prefix aws-classify-server/tests/client run test:online`. That suite
 resets the deployed service's test sessions; deploy the fixture explicitly with
 `npm --prefix aws-classify-server/tests/server run deploy` when needed.
+
+## Security checks
+
+From the repository root, run:
+
+```sh
+npm run audit
+```
+
+This audits all six lockfiles: root tooling, the three library packages, and both
+test packages. It checks every package even if one fails, and returns a failing
+exit code when any audit finds an advisory or encounters an error.
+
+The AWS SDK and Axios dependency minimums now match the reviewed, updated
+versions. The updated server library requires Node.js 20 or later. The unused
+`aws-lambda` deployment tool was removed; `@types/aws-lambda` supplies the types
+used by this code.
+
+Jest 30 and TypeScript ESLint 8 remove the vulnerable `braces` dependency from
+the test and lint tools. The root manifest overrides only Bisync's Chokidar
+dependency to version 4, which also removes `braces`. This avoids the
+[unpatched recursive-pattern advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm).
+Chokidar 4 watches literal file and directory paths; the existing `bisync.json`
+uses those paths. The regression test checks synchronization in both directions
+for directory contents and individual files. Glob patterns in watch paths are
+not supported by this override.

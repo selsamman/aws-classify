@@ -1,9 +1,15 @@
 {
   "devDependencies": {
-    "bisync": "^0.9.7"
+    "bisync": "^0.9.9"
   },
   "scripts": {
     "install:tests": "npm --prefix aws-classify-server/tests/server ci && npm --prefix aws-classify-server/tests/client ci",
-    "test": "npm --prefix aws-classify-server/tests/server run test:harness && npm --prefix aws-classify-server/tests/client test"
+    "test": "node --test scripts/bisync.test.js && npm --prefix aws-classify-server/tests/server run test:harness && npm --prefix aws-classify-server/tests/client test",
+    "audit": "node scripts/audit.js"
+  },
+  "overrides": {
+    "bisync": {
+      "chokidar": "^4.0.3"
+    }
   }
 }
