@@ -25,6 +25,7 @@
     "typescript": "^4.9.5"
   },
   "dependencies": {
+    "aws-classify-common": "0.1.0",
     "axios": "^1.20.0",
     "js-freeze-dry": "^1.1.4"
   }

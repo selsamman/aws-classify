@@ -1,0 +1,44 @@
+{
+  "name": "@aws-classify-tests/server",
+  "version": "0.1.0",
+  "description": "Server portion of aws-classify",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test --workspace @aws-classify-tests/client",
+    "test:harness": "node --test offline.test.js",
+    "typecheck": "tsc --noEmit",
+    "debug": "node offline.js --debug",
+    "start": "node offline.js",
+    "deploy": "serverless deploy --stage dev",
+    "prestart": "npm --prefix ../.. run build",
+    "predebug": "npm --prefix ../.. run build",
+    "predeploy": "npm --prefix ../.. run build"
+  },
+  "files": [
+    "lib",
+    "yml"
+  ],
+  "author": "Sam Elsamman",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.103",
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.71.0",
+    "@typescript-eslint/parser": "^8.71.0",
+    "eslint": "^8.57.1",
+    "serverless-offline": "^14.8.2",
+    "typescript": "^5.9.3",
+    "serverless": "^4.43.0",
+    "dynalite": "^4.0.0"
+  },
+  "dependencies": {
+    "aws-classify-server": "0.1.9",
+    "@aws-classify-tests/requests": "0.1.0",
+    "@aws-sdk/client-dynamodb": "^3.1146.0",
+    "js-freeze-dry": "^1.1.4"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

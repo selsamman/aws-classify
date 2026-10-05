@@ -1,6 +1,1 @@
-export interface LambdaResponse {
-    data : any,
-    cargo : any,
-    exception : string | undefined,
-    sessionId : string
-}
+export type {LambdaResponse} from "aws-classify-common";

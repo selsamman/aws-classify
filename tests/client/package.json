@@ -1,0 +1,31 @@
+{
+  "name": "@aws-classify-tests/client",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:online": "jest --config jest.config.online.js",
+    "start": "cd ../server && npm run start",
+    "pretest": "npm --prefix ../.. run build",
+    "pretest:online": "npm --prefix ../.. run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "author": "Sam Elsamman",
+  "license": "ISC",
+  "devDependencies": {
+    "@testing-library/jest-dom": "^5.16.5",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^18.8.3",
+    "@typescript-eslint/eslint-plugin": "^8.71.0",
+    "@typescript-eslint/parser": "^8.71.0",
+    "eslint": "^8.57.1",
+    "jest": "^30.5.2",
+    "jest-environment-jsdom": "^30.5.2",
+    "ts-jest": "^29.4.14",
+    "typescript": "^4.9.5"
+  },
+  "dependencies": {
+    "aws-classify-client": "0.1.0",
+    "@aws-classify-tests/requests": "0.1.0"
+  }
+}

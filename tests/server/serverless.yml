@@ -1,0 +1,52 @@
+service: 'aws-classify-tests'
+frameworkVersion: '4'
+
+custom:
+
+  domain: awsclassify.com
+  certificateARN: "arn:aws:acm:us-east-1:############:certificate/########-####-####-####-############"
+  prefixes:
+    dev: test.
+    prod: ''
+  directories:
+    responseHandlers: "src/server-responses/index"
+    staticWebsite: "./static"
+    includeFiles: "../../aws-classify-server/yml"
+  yml: ${self:custom.directories.includeFiles}
+  stage: ${opt:stage,'dev'}
+  hostedZoneName: ${self:custom.domain}.
+  domainName: ${self:custom.prefixes.${self:custom.stage}}${self:custom.domain}
+  handler: "src/server-responses/index"
+  bucketName: ${self:custom.domainName}
+  serverless-offline:
+    host: 127.0.0.1
+    httpPort: 4000
+    websocketPort: 3001
+    lambdaPort: 3002
+    useInProcess: true
+    localEnvironment: true
+
+plugins:
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: us-east-1
+  websocketsApiRouteSelectionExpression: $request.body.action
+  logs:
+    websocket: true
+  environment:
+    APIG_ENDPOINT: ${file(${self:custom.yml}/apig.yml)}
+    DOMAIN: ${self:custom.domainName}
+  iam:
+    role:
+      statements:
+      - ${file(${self:custom.yml}/provider-iam.yml)}
+
+functions:
+  - ${file(${self:custom.yml}/functions.yml)}
+
+resources:
+  - ${file(${self:custom.yml}/resources-website.yml)}
+  - ${file(${self:custom.yml}/resources-dynamodb.yml)}

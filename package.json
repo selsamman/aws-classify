@@ -1,11 +1,26 @@
 {
+  "name": "aws-classify-workspace",
+  "private": true,
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "workspaces": [
+    "aws-classify-common",
+    "aws-classify-client",
+    "aws-classify-server",
+    "tests/requests",
+    "tests/server",
+    "tests/client"
+  ],
   "devDependencies": {
     "bisync": "^0.9.9"
   },
   "scripts": {
-    "install:tests": "npm --prefix aws-classify-server/tests/server ci && npm --prefix aws-classify-server/tests/client ci",
-    "test": "node --test scripts/bisync.test.js && npm --prefix aws-classify-server/tests/server run test:harness && npm --prefix aws-classify-server/tests/client test",
-    "audit": "node scripts/audit.js"
+    "install:tests": "npm ci --ignore-scripts && npm rebuild serverless && npm run build",
+    "build": "npm run build --workspace aws-classify-common && npm run build --workspace aws-classify-client && npm run build --workspace aws-classify-server",
+    "typecheck": "npm run build && npm run typecheck --workspace @aws-classify-tests/requests && npm run typecheck --workspace @aws-classify-tests/server && npm run typecheck --workspace @aws-classify-tests/client",
+    "test": "npm run test:harness --workspace @aws-classify-tests/server && npm test --workspace @aws-classify-tests/client",
+    "audit": "npm audit"
   },
   "overrides": {
     "bisync": {

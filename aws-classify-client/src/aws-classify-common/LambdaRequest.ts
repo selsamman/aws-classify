@@ -1,6 +1,1 @@
-export interface LambdaRequest {
-    interfaceName: string,
-    methodName: string,
-    args: any,
-    sessionId: string
-}
+export type {LambdaRequest} from "aws-classify-common";

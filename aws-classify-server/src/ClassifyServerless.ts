@@ -1,6 +1,6 @@
 import {deserialize, serialize} from "js-freeze-dry";
 import {ClassDef} from "./ClassDef";
-import {LambdaRequest, LambdaResponse} from "./aws-classify-common";
+import type {LambdaRequest, LambdaResponse} from "aws-classify-common";
 import {DynamoDBDocument} from "@aws-sdk/lib-dynamodb";
 import {DynamoDBClient} from "@aws-sdk/client-dynamodb";
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from "@aws-sdk/client-apigatewaymanagementapi";

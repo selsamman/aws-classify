@@ -1,4 +1,4 @@
-import {LambdaRequest, LambdaResponse, EndPointsLogging} from "./aws-classify-common";
+import type {LambdaRequest, LambdaResponse, EndPointsLogging} from "aws-classify-common";
 import {deserialize, serialize} from "js-freeze-dry";
 import axios from "axios";
 

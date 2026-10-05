@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Browser integration tests",
+  "compilerOptions": {
+    "lib": [
+      "es2021",
+      "dom"
+    ],
+    "module": "commonjs",
+    "target": "es2021",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "outDir": "build",
+    "types": [
+      "jest",
+      "node"
+    ]
+  },
+  "exclude": [
+    "tests/**/*"
+  ]
+}
