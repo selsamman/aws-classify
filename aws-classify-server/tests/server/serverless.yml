@@ -1,4 +1,5 @@
 service: 'aws-classify-tests'
+frameworkVersion: '4'
 
 custom:
 
@@ -10,43 +11,27 @@ custom:
   directories:
     responseHandlers: "src/server-responses/index"
     staticWebsite: "./static"
-    includeFiles: "node_modules/aws-classify/yml"
-  yml: "../../yml/"
+    includeFiles: "../../yml"
+  yml: ${self:custom.directories.includeFiles}
   stage: ${opt:stage,'dev'}
   hostedZoneName: ${self:custom.domain}.
   domainName: ${self:custom.prefixes.${self:custom.stage}}${self:custom.domain}
   handler: "src/server-responses/index"
   bucketName: ${self:custom.domainName}
-  s3Sync:
-    noSync: true
-    buckets:
-    - bucketName: ${self:custom.bucketName}
-      localDir: ${self:custom.directories.staticWebsite}
-  cloudfrontInvalidate: ${file(${self:custom.yml}/custom-cloudfront.yml)}
   serverless-offline:
+    host: 127.0.0.1
     httpPort: 4000
-  dynamodb:
-    stages:
-      - dev
-    start:
-      port: 8000
-      inMemory: true
-      heapInitial: 200m
-      heapMax: 1g
-      convertEmptyValues: true
-
+    websocketPort: 3001
+    lambdaPort: 3002
+    useInProcess: true
+    localEnvironment: true
 
 plugins:
-  - serverless-plugin-scripts
-  - serverless-s3-sync
-  - serverless-cloudfront-invalidate
-  - serverless-plugin-typescript
-  - serverless-dynamodb
   - serverless-offline
 
 provider:
   name: aws
-  runtime: nodejs16.x
+  runtime: nodejs22.x
   region: us-east-1
   websocketsApiRouteSelectionExpression: $request.body.action
   logs:

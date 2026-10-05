@@ -5,6 +5,25 @@ import {ClientResponse} from "./client-responses/ClientResponse";
 let sessionCount = 0;
 jest.setTimeout(60000);
 
+async function closeSocket(client: ClassifyClient | undefined) {
+    const socket = client?.socket;
+    if (!socket || socket.readyState === WebSocket.CLOSED) return;
+    await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timed out closing test WebSocket')), 5000);
+        socket.addEventListener('close', () => {
+            clearTimeout(timeout);
+            resolve();
+        }, {once: true});
+        socket.close();
+    });
+}
+
+async function receiveCount(response: ClientResponse, send: () => Promise<void>) {
+    const count = new Promise<number>(resolve => { response.setCount = resolve; });
+    const [result] = await Promise.all([count, send()]);
+    return result;
+}
+
 beforeAll( async () => {
     let session = "";
     const classifyClient = new ClassifyClient(
@@ -18,14 +37,13 @@ beforeAll( async () => {
     ++sessionCount;
 });
 
-console.log(process.env.__testURL__);
 describe("work without WebSockets",  () => {
     let classifyClient : ClassifyClient;
     let session = "";
     let serverRequest : ServerRequest
 
     beforeEach(async () => {
-        console.log(`API Endpoint: ${process.env.__API_}`);
+        console.log(`API Endpoint: ${process.env.__API__}`);
         classifyClient = new ClassifyClient(
             async () => session,
             async (sessionIn: string) => {
@@ -35,7 +53,8 @@ describe("work without WebSockets",  () => {
         serverRequest = classifyClient.createRequest(ServerRequest);
         ++sessionCount;
     });
-    afterEach (() => {
+    afterEach (async () => {
+        await closeSocket(classifyClient);
         session = "";
         classifyClient = undefined as unknown as ClassifyClient;
     });
@@ -52,7 +71,7 @@ describe("single session tests",  () => {
     let serverRequest : ServerRequest
 
     beforeEach(async () => {
-        console.log(`API Endpoint: ${process.env.__API_}`);
+        console.log(`API Endpoint: ${process.env.__API__}`);
         classifyClient = new ClassifyClient(
             async () => session,
             async (sessionIn: string) => {
@@ -60,10 +79,11 @@ describe("single session tests",  () => {
             },
             process.env.__API__);
         serverRequest = classifyClient.createRequest(ServerRequest);
-        await classifyClient.initSocket();
+        expect(await classifyClient.initSocket()).toBe(true);
         ++sessionCount;
     });
-    afterEach (() => {
+    afterEach (async () => {
+        await closeSocket(classifyClient);
         session = "";
         classifyClient = undefined as unknown as ClassifyClient;
     });
@@ -74,10 +94,7 @@ describe("single session tests",  () => {
     it ("can callback to the client", async () => {
         const clientResponse = classifyClient.createResponse(ClientResponse);
         await serverRequest.setCount(3);
-        expect (await new Promise( async resolve => {
-            clientResponse.setCount = count => resolve(count);
-            await serverRequest.sendCount();
-        })).toBe(3);
+        expect(await receiveCount(clientResponse, () => serverRequest.sendCount())).toBe(3);
     });
 });
 describe("multi session tests",  () => {
@@ -88,42 +105,23 @@ describe("multi session tests",  () => {
     let session2 = "";
     let serverRequest2 : ServerRequest
     beforeEach(async () => {
-        await new Promise((resolve, reject) => {
-            try {
-                classifyClient1 = new ClassifyClient(
-                    async () => session1,
-                    async (sessionIn: string) => {
-                        session1 = sessionIn
-                    },
-                    process.env.__API__);
-                classifyClient1.setLogger(msg => console.log(msg));
-                classifyClient1.setLogLevel({calls: true});
-                classifyClient1.onDisconnect(() => console.log('disconnected'));
-                classifyClient1.onConnect(() => resolve(true));
-                classifyClient1.initSocket();
-                serverRequest1 = classifyClient1.createRequest(ServerRequest);
-            } catch (e) { reject(e) }
-        });
+        classifyClient1 = new ClassifyClient(
+            async () => session1,
+            async (sessionIn: string) => { session1 = sessionIn; },
+            process.env.__API__);
+        serverRequest1 = classifyClient1.createRequest(ServerRequest);
+        expect(await classifyClient1.initSocket()).toBe(true);
         ++sessionCount;
-        await new Promise((resolve, reject) => {
-            try {
-                classifyClient2 = new ClassifyClient(
-                    async () => session2,
-                    async (sessionIn: string) => {
-                        session2 = sessionIn
-                    },
-                    process.env.__API__);
-                classifyClient2.setLogger(msg => console.log(msg));
-                classifyClient2.setLogLevel({calls: true});
-                classifyClient2.onDisconnect(() => console.log('disconnected'));
-                classifyClient2.onConnect(() => resolve(true));
-                classifyClient2.initSocket();
-                serverRequest2 = classifyClient2.createRequest(ServerRequest);
-            } catch (e) { reject(e) }
-        });
+        classifyClient2 = new ClassifyClient(
+            async () => session2,
+            async (sessionIn: string) => { session2 = sessionIn; },
+            process.env.__API__);
+        serverRequest2 = classifyClient2.createRequest(ServerRequest);
+        expect(await classifyClient2.initSocket()).toBe(true);
         ++sessionCount;
     });
-    afterEach (() => {
+    afterEach (async () => {
+        await Promise.all([closeSocket(classifyClient1), closeSocket(classifyClient2)]);
         session1 = "";
         classifyClient1 = undefined as unknown as ClassifyClient;
         session2 = "";
@@ -147,25 +145,13 @@ describe("multi session tests",  () => {
         await serverRequest1.setCount(1);
         await serverRequest2.setCount(2);
 
-        expect (await new Promise( async resolve => {
-            clientResponse2.setCount = count => resolve(count);
-            await serverRequest1.sendOurCountTo(sessionId2);
-        })).toBe(1);
+        expect(await receiveCount(clientResponse2, () => serverRequest1.sendOurCountTo(sessionId2))).toBe(1);
 
-        expect (await new Promise( async resolve => {
-            clientResponse1.setCount = count => resolve(count);
-            await serverRequest2.sendOurCountTo(sessionId1);
-        })).toBe(2);
+        expect(await receiveCount(clientResponse1, () => serverRequest2.sendOurCountTo(sessionId1))).toBe(2);
 
-        expect (await new Promise( async resolve => {
-            clientResponse2.setCount = count => resolve(count);
-            await serverRequest1.sendCountTo(sessionId2);
-        })).toBe(2);
+        expect(await receiveCount(clientResponse2, () => serverRequest1.sendCountTo(sessionId2))).toBe(2);
 
-        expect (await new Promise( async resolve => {
-            clientResponse1.setCount = count => resolve(count);
-            await serverRequest2.sendCountTo(sessionId1);
-        })).toBe(1);
+        expect(await receiveCount(clientResponse1, () => serverRequest2.sendCountTo(sessionId1))).toBe(1);
 
         const sessions = await serverRequest1.getSessions();
         console.log(sessions.join(",") + sessionId1 + sessionId2);

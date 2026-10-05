@@ -1,6 +1,6 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
-  globalSetup: '../server/start-offline.js',
-  globalTeardown: '../server/stop-offline.js'
+  globalSetup: '<rootDir>/../server/start-offline.js',
+  globalTeardown: '<rootDir>/../server/stop-offline.js'
 };

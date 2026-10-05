@@ -4,11 +4,12 @@
   "description": "Server portion of aws-classify",
   "main": "index.js",
   "scripts": {
-    "test": "npm test",
-    "debug": "SLS_DEBUG=* node --inspect node_modules/serverless/bin/serverless.js offline start --stage dev",
-    "start": "sls offline start --stage dev",
-    "deploy": "sls deploy --stage dev",
-    "install:dynamodb": "sls dynamodb install"
+    "test": "npm --prefix ../client test",
+    "test:harness": "node --test offline.test.js",
+    "typecheck": "tsc --noEmit",
+    "debug": "node offline.js --debug",
+    "start": "node offline.js",
+    "deploy": "serverless deploy --stage dev"
   },
   "files": [
     "lib",
@@ -18,24 +19,24 @@
   "license": "ISC",
   "devDependencies": {
     "@types/aws-lambda": "^8.10.103",
-    "@types/node": "^18.8.3",
+    "@types/node": "^22.0.0",
     "@typescript-eslint/eslint-plugin": "^5.36.2",
     "@typescript-eslint/parser": "^5.36.2",
     "aws-lambda": "^1.0.7",
     "eslint": "8.22.0",
-    "serverless-cloudfront-invalidate": "^1.12.2",
-    "serverless-esbuild": "^1.32.8",
-    "serverless-offline": "^8.8.0",
-    "serverless-plugin-scripts": "^1.0.2",
-    "serverless-plugin-typescript": "^2.1.2",
-    "serverless-s3-sync": "^3.0.0",
-    "serverless-dynamodb": "^0.2.42",
-    "typescript": "^4.8.2"
+    "serverless-offline": "^14.8.2",
+    "typescript": "^5.9.0",
+    "serverless": "^4.43.0",
+    "dynalite": "^4.0.0"
   },
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.180.0",
     "@aws-sdk/client-dynamodb": "^3.168.0",
     "@aws-sdk/lib-dynamodb": "^3.168.0",
     "js-freeze-dry": "^1.1.4"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20.19.0"
   }
 }

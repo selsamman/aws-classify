@@ -1,5 +1,9 @@
 {
   "devDependencies": {
     "bisync": "^0.9.7"
+  },
+  "scripts": {
+    "install:tests": "npm --prefix aws-classify-server/tests/server ci && npm --prefix aws-classify-server/tests/client ci",
+    "test": "npm --prefix aws-classify-server/tests/server run test:harness && npm --prefix aws-classify-server/tests/client test"
   }
 }

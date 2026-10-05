@@ -1,6 +1,6 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'jsdom',
-  globalSetup: '../server/start-online.js',
+  globalSetup: '<rootDir>/../server/start-online.js',
   testEnvironmentOptions: {url:process.env.WebsiteURL}
 };
