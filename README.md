@@ -1,3 +1,13 @@
+# Optional authentication
+
+Provider-neutral Gateway authentication, separate public/protected dispatch, and owned WebSocket notification sessions are described in [the authentication guide](docs/AUTHENTICATION.md). Existing consumers retain legacy mode unless they opt in.
+
+The [managed browser lifecycle](docs/CLIENT_AUTHENTICATION_LIFECYCLE.md) provides
+optional OIDC login completion, private tab credentials, refresh and local
+logout. Application code builds provider URLs and navigates. The existing
+`getAccessToken()` integration remains available for applications that already
+manage authentication.
+
 # aws-classify
 
 A library for calling AWS lambda functions from a browser or react-native app where the lambda functions are implemented as Typescript class members.  You create a request and corresponding response class. When you call the request class member function aws-classify takes care of the magic of invoking the corresponding response class member as a Lambda function. 

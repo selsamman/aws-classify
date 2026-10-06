@@ -164,9 +164,96 @@ used by this code.
 Jest 30 and TypeScript ESLint 8 remove the vulnerable `braces` dependency from
 the test and lint tools.
 
-## Planned test and authentication work
+## Authentication validation
 
 The [authentication feature request](../docs/FEATURE_REQUEST_AUTHENTICATION.md)
-records the baseline test/deployment work and the planned provider-neutral
-authentication and secure WebSocket support. Authentication remains follow-up
-work; the current fixture exercises the existing session protocol.
+records the baseline work, implemented decisions, and actual validation results.
+The [authentication guide](../docs/AUTHENTICATION.md) describes the opt-in APIs
+and migration. The original fixture and behavior suite continue to exercise
+legacy mode. The expanded default command also checks immutable context,
+ownership, credential transactions, configuration validation, and both offline
+routes under explicit `--noAuth`. Offline checks do not validate authentication.
+
+The [managed client lifecycle](../docs/CLIENT_AUTHENTICATION_LIFECYCLE.md)
+adds protocol/race tests to the unit suite and real Chrome/Cognito browser
+acceptance to `--auth` deployments. The historical results below predate those
+cases. Final lifecycle results are in feature-request section 15; Okta remains
+unvalidated.
+
+```sh
+npm run test:aws -- --auth
+# Same account/region/prefix and cleanup options as the legacy runner:
+npm run test:aws -- --auth --suffix review --region us-east-1
+npm run test:packed
+```
+
+Authenticated runs provision two disposable Cognito pools, user and OAuth app
+clients, a default Cognito domain, custom fixture scopes, and synthetic users.
+Additional permissions are needed for Cognito, reading/updating the owned
+WebSocket stage, and invoking the test-only background notification Lambda.
+Tokens/passwords/client secrets remain in process memory and are never written
+to the run report. WebSocket execution tracing is disabled before credentials
+are sent. Reports contain case names/results, resource IDs, source hashes,
+packaged templates, stack diagnostics, and cleanup status.
+
+The matrix uses real signed tokens for wrong issuer/client, ID token, missing
+scope, and expiry cases. The wrong-issuer client is included in the audience
+list to isolate issuer enforcement. Scope OR behavior is checked using a user
+access token with `aws.cognito.signin.user.admin` and an OAuth access token with
+`fixture/invoke`; `fixture/other` cannot enter protected dispatch. Expiry takes
+at least five minutes; other tokens are refreshed rather than inadvertently
+using expired tokens to test different policies. Both endpoints test independent
+public/protected enforcement, forged identity fields, member scope policy,
+session isolation, credential expiry/replay/session binding/concurrent use,
+reconnection, disconnect races, recipient isolation and IAM-only background
+notification delivery. Failed cases fail the command and trigger cleanup.
+
+Every deployment packages in its own copied fixture directory, with short,
+isolated Lambda/IAM names, so concurrent runs do not share Serverless build
+output. Avoid editing library sources while validation is running: the report
+records the source revision used for each step. Forced termination still needs
+saved-manifest cleanup. `test:packed` installs tarballs in a temporary consumer
+outside the repository and verifies legacy constructors/callbacks, public and
+common subpath imports, TypeScript, CommonJS runtime and browser bundling.
+
+
+Validation on 2026-10-05 passed 88 default offline checks, library builds and
+workspace typechecks, the packed-consumer matrix, and a zero-vulnerability audit.
+The original 23 behavior cases passed through both Gateway and CloudFront. The
+complete authentication fixture passed 23 cases on each endpoint (46 total),
+including real WebSockets and the IAM-only notification producer. All resources
+owned by these runs were removed. Exact reports and implemented lifecycle limits
+are recorded in the feature request linked above.
+
+The authentication AWS runner also requires Google Chrome installed, or
+`BROWSER_EXECUTABLE=/absolute/path/to/a/Chromium/browser`. It uses playwright-core
+without downloading a browser. It uploads a separate test application to the
+owned default CloudFront distribution and registers that return/logout URL on a
+run-owned public Cognito code client with refresh rotation. Its application code
+builds login/logout URLs, preserves PKCE parameters and removes callback history.
+The fixture supplies an unauthenticated OPTIONS route, with Gateway CORS
+headers, for direct cross-origin browser calls; that route invokes no dispatch.
+Real browser calls exercise both direct Gateway (including CORS) and CloudFront,
+code exchange, tab reload, refresh rotation, socket/local logout, public calls,
+provider cookie logout and a second login/account change. No HAR, browser trace,
+passwords, codes, tokens or refresh credentials are written to reports.
+
+The test-only YAML loader override upgrades `@istanbuljs/load-nyc-config` to
+js-yaml 4's compatible `load()` API to remove the transitive sprintf-js advisory
+GHSA-hp3w-g68c-fv3c. A harness test verifies YAML coverage configuration parsing.
+Normal fake-process harness shutdown uses one second of grace; its dedicated
+forced-kill case still uses 200 ms and verifies both parent and child release.
+The real offline harness retains five seconds. Cleanup failures include their
+underlying error messages.
+
+Jest's Node export conditions and encoder setup make JOSE usable in jsdom;
+real Chrome and packed-browser builds separately validate browser ESM behavior.
+
+Validation on 2026-10-06 passed 120 default offline checks, 71 final focused unit
+checks, builds/workspace/browser-fixture typechecks, packed consumers and a
+zero-vulnerability audit. Disposable AWS validation passed 57 authentication
+checks (including 11 real-browser cases), repeated all 11 against the final
+client bundle, and passed all 46 legacy cases through Gateway and default
+CloudFront. All four owned deployments, including failed attempts, were cleaned;
+no recorded owned Lambda log groups remained. Reports and provider/lifecycle
+limits are recorded in feature-request section 15. Okta remains untested.

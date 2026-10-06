@@ -13,19 +13,25 @@
     "tests/client"
   ],
   "devDependencies": {
+    "@istanbuljs/load-nyc-config": "^1.1.0",
     "bisync": "^0.9.9"
   },
   "scripts": {
     "install:tests": "npm ci --ignore-scripts && npm rebuild serverless && npm run build",
     "build": "npm run build --workspace aws-classify-common && npm run build --workspace aws-classify-client && npm run build --workspace aws-classify-server",
     "typecheck": "npm run build && npm run typecheck --workspace @aws-classify-tests/requests && npm run typecheck --workspace @aws-classify-tests/server && npm run typecheck --workspace @aws-classify-tests/client",
-    "test": "npm run test:harness --workspace @aws-classify-tests/server && npm test --workspace @aws-classify-tests/client",
+    "test": "npm run test:harness --workspace @aws-classify-tests/server && npm test --workspace @aws-classify-tests/client && npm run test:auth:offline --workspace @aws-classify-tests/client",
     "audit": "npm audit",
-    "test:aws": "npm run build && npm run test:aws --workspace @aws-classify-tests/server --"
+    "test:aws": "npm run build && npm run test:aws --workspace @aws-classify-tests/server --",
+    "test:packed": "npm run build && node tests/packed-consumer.js",
+    "test:aws:auth": "npm run test:aws -- --auth"
   },
   "overrides": {
     "bisync": {
       "chokidar": "^4.0.3"
+    },
+    "@istanbuljs/load-nyc-config": {
+      "js-yaml": "^4.3.2"
     }
   }
 }

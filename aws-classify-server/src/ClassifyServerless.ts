@@ -1,18 +1,41 @@
 import {deserialize, serialize} from "js-freeze-dry";
 import {ClassDef} from "./ClassDef";
-import type {LambdaRequest, LambdaResponse} from "aws-classify-common";
-import {DynamoDBDocument} from "@aws-sdk/lib-dynamodb";
-import {DynamoDBClient} from "@aws-sdk/client-dynamodb";
+import type {LambdaRequest, LambdaResponse, RequestContext} from "aws-classify-common";
+import {sessionStore as ddbDocClient} from "./SessionStore";
+import {AsyncLocalStorage} from "node:async_hooks";
+import {validatePublicSuffix} from "aws-classify-common";
+import {HttpEvent, ServerAuthenticationOptions, requestContext} from "./Authentication";
+import {ownedSession, sessionOwner, issueConnectionCredential} from "./AuthenticatedSessions";
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from "@aws-sdk/client-apigatewaymanagementapi";
-import {APIGatewayProxyEvent, Context} from "aws-lambda";
+import {Context} from "aws-lambda";
 import {ClassifyResponse} from "./ClassifyResponse";
 
-const ddbClient = new DynamoDBClient({ region: process.env.DD_REGION, endpoint: process.env.DD_ENDPOINT });
-const ddbDocClient = DynamoDBDocument.from(ddbClient);
 
 const updateDebounceInterval = 1000 * 60 * 10; // Don't update session unless 10 minutes have passed or data changed
 
 export class ClassifyServerless {
+
+    private authentication: ServerAuthenticationOptions | undefined;
+    private readonly contexts = new AsyncLocalStorage<RequestContext>();
+    private readonly activeContexts = new Set<RequestContext>();
+    private readonly responseContexts = new WeakMap<object, RequestContext>();
+
+    constructor() {
+        if (process.env.AWS_CLASSIFY_AUTHENTICATION === 'true')
+            this.configureAuthentication({publicSuffix: process.env.AWS_CLASSIFY_PUBLIC_SUFFIX || ''});
+    }
+    configureAuthentication(options: ServerAuthenticationOptions) {
+        validatePublicSuffix(options.publicSuffix);
+        const seconds = options.connectionCredentialSeconds ?? 60;
+        if (!Number.isInteger(seconds) || seconds < 1 || seconds > 300) throw new Error('connectionCredentialSeconds must be 1–300');
+        this.authentication = Object.freeze({...options, connectionCredentialSeconds: seconds});
+    }
+    get authenticationEnabled() { return !!this.authentication; }
+    getRequestContext(response?: object): RequestContext | undefined {
+        const current = this.contexts.getStore();
+        if (!current || !this.activeContexts.has(current)) return undefined;
+        return response ? (this.responseContexts.get(response) === current ? current : undefined) : current;
+    }
 
     logLevel: Partial<typeof EndPointsLogging> = {};
     classDefs : Map<any, ClassDef<any, any>> = new Map();
@@ -34,7 +57,7 @@ export class ClassifyServerless {
     }
 
     registerResponse<T>(responseClass : new () => T,
-                            authorizer? : (_endPoint: T, _method: string, _args: IArguments) => Promise<boolean>) {
+                            authorizer? : (_endPoint: T, _method: string, _args: IArguments, _context?: RequestContext) => Promise<boolean>) {
 
         // Find ultimate base class
         let clientClass = responseClass;
@@ -52,15 +75,30 @@ export class ClassifyServerless {
         (responseClass as any).__interfaceName__ = interfaceName;
     }
 
-    async dispatch (ev: APIGatewayProxyEvent, context : Context, classes  = {}) {
+    async dispatch(ev: HttpEvent, context: Context, classes = {}, entry: 'protected' | 'public' = 'protected') {
+        if (entry === 'public' && !this.authentication) throw new Error('Public dispatch requires authentication configuration');
+        const trusted = requestContext(ev, this.authentication ? entry : 'legacy', this.authentication);
+        this.activeContexts.add(trusted);
+        try { return await this.contexts.run(trusted, () => this.dispatchRequest(ev, context, classes, trusted)); }
+        finally { this.activeContexts.delete(trusted); }
+    }
+
+    private async dispatchRequest(ev: HttpEvent, context: Context, classes: any, trusted: RequestContext) {
 
         const request = deserialize(ev.body as string, classes) as LambdaRequest;
+        if (!request || typeof request.interfaceName !== 'string' || typeof request.methodName !== 'string' || !Array.isArray(request.args) || typeof request.sessionId !== 'string') throw new Error('Malformed dispatch request');
         const logName = `${request.interfaceName}.${request.methodName}`;
         let sessionId = request.sessionId; //  May be empty
 
         // Pseudo interface/method to request socket access and return a session id to use in connect
-        // session id will be passed in sec-websocket-protocol on connect request
+        // Legacy mode passes the session id; authenticated mode issues a separate credential.
         if (logName === '$WebSocket.$authorize') {
+            if (this.authentication) {
+                if (trusted.dispatch !== 'protected') throw new Error('Socket authorization requires protected dispatch');
+                const session = await ownedSession(sessionId, sessionOwner(trusted), this.expirationMinutes);
+                const data = await issueConnectionCredential(session, this.authentication.connectionCredentialSeconds!, process.env.IS_OFFLINE ? 'ws://localhost:3001' : `wss://${process.env.APIG_ENDPOINT}`);
+                return serialize({data, sessionId: session.sessionId, exception: undefined, cargo: undefined}, classes);
+            }
             const socketResult = await getSessionData(sessionId, "");
             if (!socketResult) {
                 sessionId = context.awsRequestId;
@@ -83,18 +121,21 @@ export class ClassifyServerless {
         const classDef = this.classDefs.get(request.interfaceName);
         if (!classDef)
             throw new Error(`No Response defined for ${request.interfaceName}`)
-        if (!classDef.clientClass.prototype[request.methodName])
+        if (request.methodName === 'constructor' || !Object.prototype.hasOwnProperty.call(classDef.clientClass.prototype, request.methodName) || typeof classDef.clientClass.prototype[request.methodName] !== 'function')
             throw new Error(`${request.methodName} not found in ${request.interfaceName} client request class`);
 
+        if (this.authentication && request.methodName.endsWith(this.authentication.publicSuffix) !== (trusted.dispatch === 'public')) throw new Error('Member is not permitted on this dispatch endpoint');
+
         // If authorizer passed in make sure request is authorized
-        if (!classDef.authorizer || await classDef.authorizer(request.interfaceName, request.methodName, request.args)) {
+        if (!classDef.authorizer || await (this.authentication ? classDef.authorizer(request.interfaceName, request.methodName, request.args as any, trusted) : classDef.authorizer(request.interfaceName, request.methodName, request.args as any))) {
 
             // Instantiate the class
             const obj = new classDef.serverClass() as ClassifyResponse;
 
             // Retrieve session data from DynamoDB base on sessionId in request
             let orignalSessionData = "";
-            const result = await getSessionData(sessionId, request.interfaceName);
+            const result = this.authentication ? await ownedSession(sessionId, sessionOwner(trusted), this.expirationMinutes) : await getSessionData(sessionId, request.interfaceName);
+            if (this.authentication) sessionId = result.sessionId;
             if (!result)
                 sessionId = context.awsRequestId;
             else {
@@ -105,6 +146,7 @@ export class ClassifyServerless {
                 }
             }
 
+            this.responseContexts.set(obj, trusted);
             obj.__sessionId__  = sessionId;
             obj.__connectionId__ = result?.connectionId;
 
@@ -129,7 +171,7 @@ export class ClassifyServerless {
 
             const updatedSessionData = serialize(obj, classes);
             if (!result || updatedSessionData !== orignalSessionData  || (Date.now() > (result.updated + updateDebounceInterval)))
-                sessionId  = await saveSessionData(sessionId, request.interfaceName, updatedSessionData, undefined, obj.__userId__, this.expirationMinutes);
+                sessionId  = await saveSessionData(sessionId, request.interfaceName, updatedSessionData, undefined, obj.__userId__, this.expirationMinutes, this.authentication ? sessionOwner(trusted) : undefined);
 
             // Formulate response
             const lambdaResponse : LambdaResponse = {
@@ -173,7 +215,12 @@ export class ClassifyServerless {
 
                     // Build request
                     const sessionId = this['__sessionId__'];
-                    const connectionId = this['__connectionId__'];
+                    let connectionId = this['__connectionId__'];
+                    if (expressServer.authentication && sessionId) {
+                        const live = await getSessionData(sessionId);
+                        if (!live?.authOwner || live.authOwner === 'public' || !(live.expires > Math.floor(Date.now() / 1000))) throw new Error('Invalid authenticated notification session');
+                        connectionId = live.connectionId;
+                    }
                     if (!sessionId)
                         throw new Error(`You must instantiate ${interfaceName} using the ClassifyServerless.createRequest`);
                     if (!connectionId)
@@ -245,6 +292,7 @@ export class ClassifyServerless {
         const result = await getSessionData(sessionId);
         if (!result)
             throw new Error(`ClassifyResponse.createRequestForSession: invalid session id`)
+        if (this.authentication && (!result.authOwner || result.authOwner === 'public' || !(result.expires > Math.floor(Date.now() / 1000)))) throw new Error('Invalid authenticated notification session');
         if (!result.connectionId)
             throw new Error(`WebSocket handshake not established for session`);
 
@@ -264,6 +312,7 @@ export class ClassifyServerless {
         const result = await getSessionData(sessionId, interfaceName);
         if (!result)
             throw new Error(`ClassifyResponse.createResponse: invalid session id for interface ${interfaceName}`)
+        if (this.authentication && (!result.authOwner || result.authOwner === 'public' || !(result.expires > Math.floor(Date.now() / 1000)))) throw new Error('Invalid authenticated notification session');
         const sessionData = result[`interface_${interfaceName}`];
 
         // Instantiate the class
@@ -286,7 +335,7 @@ export class ClassifyServerless {
             if (this.logLevel.calls)
                 this.log(`saving session data for ${interfaceName} with sessionId=${sessionId} connectionId= ${obj.__connectionId__} sessionData=${updatedSessionData}`);
 
-            await saveSessionData(sessionId, interfaceName, updatedSessionData, undefined, undefined, this.expirationMinutes);
+            await saveSessionData(sessionId, interfaceName, updatedSessionData, undefined, undefined, this.expirationMinutes, this.authentication ? result.authOwner : undefined);
         }
 
         return ret;
@@ -302,7 +351,7 @@ export class ClassifyServerless {
                 },
                 ProjectionExpression: `sessionId`
             });
-            return data.Items ? data.Items.map(i => i.sessionId) : [];
+            return data.Items ? data.Items.filter(i => !this.authentication || !i.sessionId.startsWith('connection#')).map(i => i.sessionId) : [];
         }
         return [];
     }
@@ -311,7 +360,7 @@ export class ClassifyServerless {
             TableName: `classifySessionStore.${process.env.DOMAIN}`,
             ProjectionExpression: `sessionId`
         });
-        return data.Items ? data.Items.map(i => i.sessionId) : [];
+        return data.Items ? data.Items.filter(i => !this.authentication || !i.sessionId.startsWith('connection#')).map(i => i.sessionId) : [];
     }
     async deleteSessionsForUserId (userId : string) {
         if (userId) {
@@ -352,14 +401,14 @@ export async function getSessionData (sessionId : string, interfaceName = "") {
             TableName: `classifySessionStore.${process.env.DOMAIN}`,
             Key: { sessionId },
             ConsistentRead: true,
-            ProjectionExpression: `interface_${interfaceName}, connectionId, userId, updated, expires`
+            ProjectionExpression: `interface_${interfaceName}, connectionId, userId, updated, expires, authOwner`
         });
         return data.Item;
     }
     return undefined;
 }
 
-export async function saveSessionData(sessionId : string, interfaceName? : string, sessionData? : string, connectionId?: string, userId?: string, expirationMinutes?: number) {
+export async function saveSessionData(sessionId : string, interfaceName? : string, sessionData? : string, connectionId?: string, userId?: string, expirationMinutes?: number, authOwner?: string) {
 
 
         const updateExpressionComponents = ['updated = :time'];
@@ -392,7 +441,8 @@ export async function saveSessionData(sessionId : string, interfaceName? : strin
             TableName: `classifySessionStore.${process.env.DOMAIN}`,
             Key: { sessionId },
             UpdateExpression: `set ${updateExpressionComponents.join(", ")}`,
-            ExpressionAttributeValues: expressionAttributeValues
+            ExpressionAttributeValues: {...expressionAttributeValues, ...(authOwner ? {':owner': authOwner, ':now': Math.floor(Date.now() / 1000)} : {})},
+            ...(authOwner ? {ConditionExpression: 'authOwner = :owner AND expires > :now'} : {})
         });
         return sessionId;
 }

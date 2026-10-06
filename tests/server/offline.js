@@ -81,7 +81,8 @@ async function startOffline(options = {}) {
             }
             dbClient?.destroy();
             process.removeListener('exit', forceCleanup);
-            if (failures.length) throw new AggregateError(failures, 'Offline shutdown failed');
+            if (failures.length) throw new AggregateError(failures,
+                `Offline shutdown failed: ${failures.map(error => error.message).join('; ')}`);
         })();
         return stopping;
     };
@@ -186,7 +187,7 @@ async function startOffline(options = {}) {
         log(`Local session table ready: ${TableName}`);
         if (options.debug) env.NODE_OPTIONS = `${env.NODE_OPTIONS || ''} --inspect=127.0.0.1:9229 --enable-source-maps`.trim();
         const offline = launch('Serverless Offline', command, [...commandArgs, 'offline', 'start', '--stage', 'dev',
-            '--httpPort', String(ports.http), '--websocketPort', String(ports.websocket), '--lambdaPort', String(ports.lambda)], env);
+            ...(options.noAuth ? ['--noAuth'] : []), '--httpPort', String(ports.http), '--websocketPort', String(ports.websocket), '--lambdaPort', String(ports.lambda)], env);
         await waitForPorts(offline, [ports.http, ports.websocket, ports.lambda]);
         log('Offline HTTP, WebSocket, and DynamoDB services ready');
         return { stop, api: `http://${host}:${ports.http}/api/dispatch` };

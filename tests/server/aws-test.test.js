@@ -35,3 +35,31 @@ test('allows recovery only for the recorded account and isolated resource names'
         assert.throws(() => validateCleanupManifest({...manifest, ...patch}, identity, 'us-east-1'));
     }
 });
+
+test('prepares separate Serverless build directories with bounded fixture names', () => {
+    const {mkdtempSync,rmSync,readFileSync,realpathSync} = require('node:fs');
+    const {tmpdir} = require('node:os');
+    const {join} = require('node:path');
+    const {prepareFixture} = require('./aws-test');
+    const dir=mkdtempSync(join(tmpdir(),'classify-runner-fixture-'));
+    try {
+        const a=prepareFixture(join(dir,'a')), b=prepareFixture(join(dir,'b'));
+        assert.notEqual(a,b);
+        assert.equal(realpathSync(join(a,'node_modules')),realpathSync(join(b,'node_modules')));
+        assert.match(readFileSync(join(a,'serverless-auth.yml'),'utf8'),/fixture-functions-authenticated.yml/);
+        assert.match(readFileSync(join(a,'serverless-auth.yml'),'utf8'),/name: \$\{self:service\}-\$\{sls:stage\}-notify/);
+        const functions=readFileSync(join(a,'fixture-functions-authenticated.yml'),'utf8');
+        assert.match(functions,/name: \$\{self:service\}-\$\{sls:stage\}-disconnect/);
+        assert.match(functions,/authentication-config.js\):authorizer/);
+    } finally {rmSync(dir,{recursive:true,force:true});}
+});
+test('loads YAML coverage configuration with the audited YAML parser override', async () => {
+    const {mkdtempSync,writeFileSync,rmSync}=require('node:fs');
+    const {tmpdir}=require('node:os');const {join}=require('node:path');
+    const dir=mkdtempSync(join(tmpdir(),'classify-coverage-config-'));
+    try {
+        writeFileSync(join(dir,'.nycrc.yml'),'all: true\ninclude:\n  - src/**/*.ts\nexclude:\n  - tests/**\n');
+        const config=await require('@istanbuljs/load-nyc-config').loadNycConfig({cwd:dir});
+        assert.equal(config.all,true);assert.deepEqual(config.include,['src/**/*.ts']);assert.deepEqual(config.exclude,['tests/**']);
+    } finally {rmSync(dir,{recursive:true,force:true});}
+});

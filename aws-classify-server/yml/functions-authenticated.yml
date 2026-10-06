@@ -1,0 +1,34 @@
+responseHandler:
+  environment:
+    AWS_CLASSIFY_AUTHENTICATION: 'true'
+    AWS_CLASSIFY_PUBLIC_SUFFIX: ${file(${self:custom.yml}/authentication-config.js):publicSuffix}
+  handler: ${self:custom.directories.responseHandlers}.responseHandler
+  events:
+    - httpApi:
+        path: /api/dispatch
+        method: ANY
+        authorizer: ${file(${self:custom.yml}/authentication-config.js):authorizer}
+connectHandler:
+  environment:
+    AWS_CLASSIFY_AUTHENTICATION: 'true'
+    AWS_CLASSIFY_PUBLIC_SUFFIX: ${file(${self:custom.yml}/authentication-config.js):publicSuffix}
+  handler: ${self:custom.directories.responseHandlers}.webSocketConnect
+  events:
+    - websocket: $connect
+disconnectHandler:
+  environment:
+    AWS_CLASSIFY_AUTHENTICATION: 'true'
+    AWS_CLASSIFY_PUBLIC_SUFFIX: ${file(${self:custom.yml}/authentication-config.js):publicSuffix}
+  handler: ${self:custom.directories.responseHandlers}.webSocketDisconnect
+  events:
+    - websocket: $disconnect
+publicResponseHandler:
+  name: ${self:service}-${sls:stage}-public
+  environment:
+    AWS_CLASSIFY_AUTHENTICATION: 'true'
+    AWS_CLASSIFY_PUBLIC_SUFFIX: ${file(${self:custom.yml}/authentication-config.js):publicSuffix}
+  handler: ${self:custom.directories.responseHandlers}.publicResponseHandler
+  events:
+    - httpApi:
+        path: /api/dispatch/public
+        method: ANY

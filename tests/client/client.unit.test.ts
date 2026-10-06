@@ -54,7 +54,7 @@ it('allows retry after the socket connection fails to open', async () => {
         post.mockResolvedValueOnce({data: serialize({sessionId: 'session', data: 'ws://fixture'})});
         const opening = c.initSocket();
         // Let the session callback and authorization request complete.
-        await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+        for (let attempt = 0; !FailedSocket.instance && attempt < 20; attempt++) await Promise.resolve();
         FailedSocket.instance.onerror!(new Event('error'));
         await jest.advanceTimersByTimeAsync(5000);
         expect(await opening).toBe(false);
@@ -62,4 +62,40 @@ it('allows retry after the socket connection fails to open', async () => {
         post.mockResolvedValueOnce({data: serialize({sessionId: '', data: ''})});
         expect(await c.initSocket()).toBe(false); expect(post).toHaveBeenCalledTimes(2);
     } finally { global.WebSocket = nativeSocket; jest.useRealTimers(); }
+});
+
+it('reads the current access token for each protected request and keeps public sessions separate', async () => {
+    class Request {static interfaceName='AuthRequest'; async inspect() {} async inspectPublic() {}}
+    let session='owned'; let token='first'; const read=jest.fn(async () => token);
+    const c=new ClassifyClient(async () => session,async value => {session=value;},'http://fixture/api/dispatch',{publicSuffix:'Public',getAccessToken:read}); c.setLogger(() => {});
+    const request=c.createRequest(Request);
+    post.mockResolvedValue({data:serialize({data:1,sessionId:'owned'})}); await request.inspect();
+    expect(post.mock.calls[0][2].headers.Authorization).toBe('Bearer first');
+    token='refreshed'; await request.inspect(); expect(post.mock.calls[1][2].headers.Authorization).toBe('Bearer refreshed');
+    post.mockResolvedValue({data:serialize({data:2,sessionId:'anonymous'})}); await request.inspectPublic();
+    expect(post.mock.calls[2][0]).toBe('http://fixture/api/dispatch/public'); expect(post.mock.calls[2][2].headers.Authorization).toBeUndefined();
+    expect(session).toBe('owned'); expect(read).toHaveBeenCalledTimes(2);
+    await request.inspectPublic(); expect(post.mock.calls[3][1]).toContain('anonymous');
+});
+it('fails protected requests when the application cannot supply an access token', async () => {
+    const c=new ClassifyClient(async () => '',async () => {},undefined,{publicSuffix:'Public',getAccessToken:() => undefined}); c.setLogger(() => {});
+    await expect(c.createRequest(ServerRequest).getCount()).rejects.toThrow('Access token required'); expect(post).not.toHaveBeenCalled();
+});
+
+it('clears a closed socket before notifying an application that may reconnect',async () => {
+    const nativeSocket=global.WebSocket;
+    class Socket extends EventTarget {
+        static instance: Socket;
+        onerror?: (event: Event) => void;
+        constructor() {super(); Socket.instance=this;}
+        close() {this.dispatchEvent(new CloseEvent('close'));}
+    }
+    global.WebSocket=Socket as unknown as typeof WebSocket;
+    try {
+        const c=client(); post.mockResolvedValue({data:serialize({sessionId:'session',data:'ws://fixture'})});
+        const opening=c.initSocket(); for(let attempt=0; !Socket.instance && attempt<20; attempt++) await Promise.resolve();
+        Socket.instance.dispatchEvent(new Event('open')); expect(await opening).toBe(true);
+        let closedState: WebSocket | undefined = c.socket;
+        c.onDisconnect(() => {closedState=c.socket;}); Socket.instance.close(); expect(closedState).toBeUndefined();
+    } finally {global.WebSocket=nativeSocket;}
 });

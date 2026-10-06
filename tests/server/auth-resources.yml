@@ -1,0 +1,106 @@
+Resources:
+  AuthUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: ${self:service}-auth
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+  WrongIssuerPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: ${self:service}-other
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+  AuthResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref AuthUserPool
+      Identifier: fixture
+      Name: Fixture
+      Scopes:
+        - ScopeName: invoke
+          ScopeDescription: Generic invocation
+        - ScopeName: other
+          ScopeDescription: Unrelated grant
+  AuthUserClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref AuthUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows: [ALLOW_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      AccessTokenValidity: 5
+      IdTokenValidity: 5
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+  AuthManagedClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: AuthResourceServer
+    Properties:
+      UserPoolId: !Ref AuthUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH]
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, fixture/invoke]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs: [http://localhost:47821/return]
+      LogoutURLs: [http://localhost:47821/signedout]
+      AccessTokenValidity: 5
+      IdTokenValidity: 5
+      RefreshTokenValidity: 1
+      RefreshTokenRotation:
+        Feature: ENABLED
+        RetryGracePeriodSeconds: 0
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: hours
+  WrongAudienceClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref AuthUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows: [ALLOW_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+  WrongIssuerClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref WrongIssuerPool
+      GenerateSecret: false
+      ExplicitAuthFlows: [ALLOW_USER_PASSWORD_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+  AuthMachineClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: AuthResourceServer
+    Properties:
+      UserPoolId: !Ref AuthUserPool
+      GenerateSecret: true
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [client_credentials]
+      AllowedOAuthScopes: [fixture/invoke, fixture/other]
+      AccessTokenValidity: 5
+      TokenValidityUnits:
+        AccessToken: minutes
+  AuthDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref AuthUserPool
+      Domain: ${param:authDomain, 'classify-fixture-local'}
+Outputs:
+  AuthUserPoolId:
+    Value: !Ref AuthUserPool
+  AuthManagedClientId:
+    Value: !Ref AuthManagedClient
+  AuthUserClientId:
+    Value: !Ref AuthUserClient
+  WrongAudienceClientId:
+    Value: !Ref WrongAudienceClient
+  WrongIssuerPoolId:
+    Value: !Ref WrongIssuerPool
+  WrongIssuerClientId:
+    Value: !Ref WrongIssuerClient
+  AuthMachineClientId:
+    Value: !Ref AuthMachineClient
+  AuthTokenUrl:
+    Value: !Join ['', ['https://', !Ref AuthDomain, '.auth.', !Ref AWS::Region, '.amazoncognito.com/oauth2/token']]
+  BackgroundNotifyName:
+    Value: !Ref BackgroundNotifyLambdaFunction

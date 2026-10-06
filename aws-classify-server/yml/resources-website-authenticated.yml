@@ -1,0 +1,69 @@
+Resources:
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Join ["-", ["access-identity", !GetAtt S3Bucket.DomainName]]
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    DependsOn:
+      - S3Bucket
+    Properties:
+      DistributionConfig:
+        PriceClass: PriceClass_All
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+        Enabled: true
+        HttpVersion: http2
+        DefaultRootObject: index.html
+        Origins:
+          - Id: api
+            DomainName: !Join [".", [!Ref HttpApi, "execute-api", !Ref AWS::Region, "amazonaws.com"]]
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+          - Id: static
+            DomainName: !GetAtt S3Bucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: !Join ["", ["origin-access-identity/cloudfront/", !Ref CloudFrontOriginAccessIdentity]]
+        CacheBehaviors:
+          - PathPattern: api/*
+            TargetOriginId: api
+            # Managed-CachingDisabled and AllViewerExceptHostHeader preserve Authorization.
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS, PATCH, POST, PUT, DELETE]
+        DefaultCacheBehavior:
+          TargetOriginId: static
+          # 'Managed-CachingOptimized'
+          # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-cache-policies.html
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          # 'Managed-CORS-S3Origin'
+          # https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html
+          OriginRequestPolicyId: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf
+          ViewerProtocolPolicy: redirect-to-https
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 1
+            ErrorCode: 403
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: ${self:custom.bucketName}
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action: "s3:GetObject"
+            Resource: !Join ["", [!GetAtt S3Bucket.Arn, "/*"]]
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+Outputs:
+  CloudFrontId:
+    Description: CloudFront Id
+    Value: !Ref CloudFrontDistribution
+  WebsiteUrl:
+    Description: Cloudfront URL
+    Value: !GetAtt CloudFrontDistribution.DomainName

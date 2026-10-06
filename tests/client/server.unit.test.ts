@@ -66,3 +66,10 @@ it('propagates a real callback transport failure to its caller', async () => {
     await expect(request.deliver()).rejects.toThrow('Unable to send message via Websocket gateway unavailable');
     expect(send).toHaveBeenCalledTimes(1);
 });
+it('keeps legacy session enumeration intact while authentication hides reverse connection records', async () => {
+    db.scan.mockResolvedValue({Items:[{sessionId:'connection#legacy-app-id'},{sessionId:'ordinary'}]});
+    const framework=new ClassifyServerless();
+    expect(await framework.getSessions()).toEqual(['connection#legacy-app-id','ordinary']);
+    framework.configureAuthentication({publicSuffix:'Public'});
+    expect(await framework.getSessions()).toEqual(['ordinary']);
+});

@@ -27,6 +27,8 @@
   "dependencies": {
     "aws-classify-common": "0.1.0",
     "axios": "^1.20.0",
-    "js-freeze-dry": "^1.1.4"
+    "jose": "^5.10.0",
+    "js-freeze-dry": "^1.1.4",
+    "oidc-client-ts": "^3.5.0"
   }
 }

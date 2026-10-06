@@ -1,8 +1,17 @@
 # Feature request: OIDC authentication and test validation
 
-Status: Stage 1 baseline test expansion and AWS validation implemented; Stage 2
-authentication remains planned. Exact authentication APIs and the open decisions
-below must be settled during implementation.
+Status: Stage 2 HTTP integration and owned socket attachment implemented.
+All 46 deployed authentication acceptance cases passed directly and through
+default CloudFront; all resources owned by these validation runs were removed. The implementation and
+migration guide is `docs/AUTHENTICATION.md`. No changes have been committed or
+published.
+
+Design revised 2026-10-06: a managed browser OIDC client lifecycle is implemented
+in section 14 and `docs/CLIENT_AUTHENTICATION_LIFECYCLE.md`. The application
+controls provider URL construction/navigation; Classify owns login transaction
+state, completion, tokens, refresh and local logout. Implementation and current validation are recorded in sections 14–15; the
+historical Stage 2 results above cover the existing
+external-token integration and owned socket attachment.
 
 Recorded: 2026-10-05. Repository baseline: `861098f`.
 
@@ -38,9 +47,13 @@ Out of scope:
   or policies. These belong to the consuming application.
 - GramSurfer's S3 authorization, presigned uploads, encoding, scheduling,
   Step Functions implementation, and other application features.
-- Production Cognito provisioning, login UI, password management, token
-  issuance, and token refresh implementation inside aws-classify.
-- JWT signature verification or a Cognito emulator inside aws-classify.
+- Production identity-provider provisioning, login UI, password management and
+  token issuance. Providers retain these responsibilities. Client token refresh
+  was outside the original Stage 2 work; the managed lifecycle in
+  section 14 brings it into framework scope.
+- Server-side JWT signature verification or a Cognito emulator inside
+  aws-classify. Standard OIDC client authentication-response validation belongs
+  to the managed client lifecycle and does not replace Gateway validation.
 - Custom-domain testing, Route 53 setup, and custom ACM certificates.
 - GitHub deployment workflows and GitHub-to-AWS OIDC setup; these can follow
   later. Initially maintainers and PR reviewers run AWS tests locally.
@@ -132,17 +145,22 @@ without hard-coding Cognito resource IDs, issuer URLs, app clients, authorizer
 names, or scope names. Preserve an extension point for other compatible Gateway
 authorizers; document how their trusted context is adapted.
 
-The client obtains the current access token through an application-supplied,
-potentially asynchronous callback. Read it for each protected request, including
+The implemented external-token client obtains the current access token through
+an application-supplied, potentially asynchronous callback. Read it for each
+protected request, including
 the socket authorization request, and send it as an Authorization bearer token.
 Login, requested scopes, token storage, and refreshing tokens belong to the
-application. Public calls do not need to carry the access token.
+application in that integration mode. Public calls do not need to carry the
+access token. The managed mode in section 14 moves client
+credential lifecycle into Classify and retains this callback as an alternative
+for existing authentication-library consumers.
 
 Authentication must be explicitly enabled so existing npm consumers retain
 their current constructors, public exports, callbacks, and deployment behavior.
 An application enabling protected dispatch must fail configuration validation
 if its required authorizer is absent; it must not silently deploy an open route.
-The exact configuration/API for this opt-in remains to be designed.
+The implemented opt-in configuration/API is recorded in section 11. Managed
+managed client lifecycle configuration is described in section 14.
 
 ## 4. Two fixed HTTP dispatch entry points
 
@@ -379,23 +397,28 @@ operations, and publication security are separate application acceptance tests
 in that repository. They are not deferred framework requirements hidden in this
 fixture.
 
-## 11. Decisions to settle before the relevant implementation
+## 11. Implemented decisions (Stage 2)
 
-These are open design details, not permission to weaken the requirements:
+These decisions implement the constraints above. Scope/role policy remains application-owned.
 
-| Decision | Constraint |
+| Decision | Implementation |
 | --- | --- |
-| Client options and shared configuration | Preserve existing construction; configure token callback, protected/public URLs, and suffix without hard-coded provider policy |
-| Trusted-context access and adapters | Per-request, compatible with existing callbacks, supports JWT context first, documents other authorizers |
-| Authenticated deployment opt-in | Missing required authorizer fails validation; existing applications retain legacy behavior |
-| Offline identity absence | Explicit local-development behavior only; never silently bypass required identity in a deployed authenticated service |
-| Public API and authenticated session interaction | Define whether public calls use separate sessions and prevent anonymous access to protected state |
-| Legacy session migration | Do not let possession of an old unbound session silently claim authenticated ownership |
-| Connection credential transport/storage | Browser-compatible transport, unpredictability, atomic consumption, explicit expiry; no raw token logging |
-| Logout/token expiry/revocation | Define how these affect existing sockets and protected sessions; authenticate-at-connect does not imply continuous validation |
-| Connection lifecycle | Define duplicate connections, disconnect cleanup, reconnect races, and notification attempts after closure |
-| Cloud test timing | Obtain real negative-case tokens without pretending forged tokens prove expiry/issuer checks |
-| Release and migration documentation | Record configuration changes, new exports, compatibility guarantees, and any unavoidable breaking change |
+| Client options | Optional fourth constructor argument `ClientAuthenticationOptions`; asynchronous `getAccessToken`; explicit suffix; derived or explicit public URL; optional paired public-session callbacks |
+| Trusted context | Deeply frozen Gateway identity/claims/scopes; optional fourth authorization callback argument; `getRequestContext(this)` for members and invocation-scoped `getRequestContext()`; `hasScope`; AsyncLocalStorage and context lifetime checks |
+| Authorizer adapter | Synchronous application adapter receives only trusted `requestContext.authorizer`; JWT adapter is the default; stable string issuer/subject required |
+| Deployment opt-in | Separate `functions-authenticated.yml`; configuration resolver requires a defined named authorizer and valid suffix/scopes; no open fallback; legacy include remains unchanged |
+| Offline | Explicit `IS_OFFLINE=true` / `--noAuth` functionality; no identity is trusted even if offline authorizer-looking fields exist; unvalidated local ownership marker |
+| Public sessions | Separate anonymous session storage; public metadata category cannot be used as protected ownership; protected state cannot be restored by public dispatch |
+| Legacy migration | Unowned, missing or expired IDs fail closed in authenticated mode; application clears legacy/account-switch session storage and starts with an empty ID |
+| Socket credentials | Browser subprotocol `ac1.<session UUID base64url>.<256-bit random secret>`; SHA-256 hash and explicit expiry stored in the owned session; default 60 seconds (configurable 1–300), capped by session expiry |
+| Credential lifecycle | Latest issuance replaces the pending credential; a DynamoDB transaction consumes once and records connection plus reverse mapping; expiry, binding and replay checked before attachment |
+| Socket lifetime | Authentication at credential issuance; token expiry/revocation does not automatically terminate established sockets; application closes on logout; every reconnect obtains fresh authenticated authorization. Immediate server-side revocation is an additional application policy |
+| Connection lifecycle | Latest successful attachment receives future notifications; older socket can remain physically open; sends resolve current connection; conditional disconnect cleanup cannot clear a replacement; transport failures propagate |
+| Background notifications | Trusted IAM-only producer uses existing helpers without browser tokens or fabricated identity; permission to choose another session remains application policy |
+| CloudFront | New authenticated default-hosting include forwards Authorization with AllViewerExceptHostHeader, disables API caching and preserves 403; legacy templates unchanged |
+| Token timing | Genuine Cognito-issued five-minute token expiry; real second-pool and other-client tokens; unrelated OAuth scope; alternate user/OAuth scope demonstrates OR; refresh non-expiry test tokens |
+| Compatibility | Legacy constructors/callbacks, common subpaths, CommonJS, external TypeScript and browser bundling checked with packed tarballs; no new production identity resources |
+| Review organization | HTTP/context/configuration work in `Authentication.ts` and authenticated includes; ownership/attachment in `AuthenticatedSessions.ts` with narrow dispatch/client/socket integrations; guide describes both review parts |
 
 Suggested work packages for separate sessions:
 
@@ -425,3 +448,155 @@ unavailable credentials distinctly from completed offline checks.
 GitHub OIDC, when revisited, concerns an automated runner obtaining temporary AWS
 deployment credentials. It is independent of application user authentication
 through Cognito/OIDC and is not required to run the local maintainer AWS command.
+
+## 13. Stage 2 validation record — 2026-10-05
+
+Both implementation parts are present as uncommitted working-tree changes.
+The review and migration guide is [AUTHENTICATION.md](AUTHENTICATION.md).
+No production identity provider, custom-domain deployment, GitHub workflow,
+GramSurfer policy, commit, or publication was added.
+
+| Validation | Result |
+| --- | --- |
+| Default offline command | 88 passed: 12 original harness regressions, 5 AWS-runner regressions, 4 authentication-configuration checks, 40 focused unit checks, 23 original behavior cases, and 4 dual-route `--noAuth` cases |
+| Library builds and workspace typechecks | Passed (`npm run typecheck`) |
+| Consolidated dependency audit | Zero vulnerabilities (`npm run audit`) |
+| Packed consumer outside workspace | Passed legacy constructor/callback, public and common subpath imports, CommonJS runtime, TypeScript, browser bundling, and packed authentication resolver checks |
+| Legacy AWS behavior | 23/23 directly and 23/23 through default CloudFront, with real WebSockets; static hosting, IAM and TTL checks passed |
+| Authenticated AWS behavior | 23/23 directly and 23/23 through default CloudFront, including real signed negative-case tokens, scope OR behavior, no unchecked identity/state authority, expired session refusal, scope-denial serialization, credential binding/expiry/replay/concurrent consumption, reconnection and recipient isolation |
+| Trusted background producer | IAM-only Lambda notified the owned session without a browser token; no fabricated request identity |
+| Sensitive logs | Direct authentication phase: 297 Lambda/Gateway log entries inspected across 7 owned groups; no raw bearer tokens or connection credentials found; execution tracing disabled |
+| Cleanup | Passed for every run owned by this session, including failed deployments; final stack and deployment bucket removal confirmed |
+
+The principal reports are local ignored artifacts:
+
+- Legacy: `.test-results/aws/aws-classify-tests-muvlbzsx-959984/run.json`.
+- Complete authentication matrix: `.test-results/aws/aws-classify-tests-release-muvm2ewp-3653bf/run.json`.
+- Earlier expanded authentication runs: `aws-classify-tests-final-muvlkxia-df5ffb`
+  (42 passed) and `aws-classify-tests-verify-muvltgia-9ba639` (44 passed), both
+  cleaned successfully.
+- Sensitive-log check: the final authentication run's `sensitive-log-check.json`.
+
+Reports preserve the baseline commit `bd948fd`, working-tree patches and hashes,
+packaged templates/fixture inputs, case results, stack events, Lambda diagnostics
+and independent cleanup status. The deployed packages are snapshots recorded in
+those reports. The final local checks also cover the small fixture-only naming
+refinements for the longest prefix and reserved Cognito domain words. Names do
+not determine authentication behavior.
+
+Deployment development exposed fixture defects rather than authentication
+successes: a reserved Cognito domain prefix, an incorrect CloudFront managed
+policy ID, AWS name-length limits, shared Serverless build output, and alternate
+scope tokens expiring while waiting for the dedicated expiry case. Each failing
+attempt failed its command and cleaned up its owned resources. The runner now
+uses per-run build directories, bounded names and a hashed Cognito domain;
+non-expiry OAuth tokens are refreshed between endpoint runs.
+
+The original offline harness and behavior tests were retained. The socket unit
+fixture now waits for actual construction after the newly awaited session save,
+rather than assuming three asynchronous steps. Framework changes also release
+failed socket initialization, close timed-out sockets, and clear the current
+socket before invoking the disconnect callback so application reconnection can
+start. Authentication-disabled enumeration preserves arbitrary legacy session
+IDs, while authenticated enumeration excludes internal reverse mappings.
+
+No original Stage 2 framework authentication acceptance case remains deferred.
+At the time of this historical Stage 2 validation, the managed client lifecycle
+was unimplemented. Its implementation and additional acceptance results now
+appear in sections 14–15. Existing socket authentication is intentionally
+checked at credential issuance; immediate
+provider revocation or token-expiry disconnection is an additional application
+policy, not a claim made by this implementation. Retained access tokens can
+still pass the native JWT authorizer until expiry after provider revocation.
+Production identity provisioning, browser navigation/UI, application permission
+mappings, and release publication remain consuming-application or release work.
+Managed token exchange/refresh and formal local logout are now implemented
+framework work as described in section 14.
+
+## 14. Managed client lifecycle — 2026-10-06
+
+The final API, examples and operational limits are in
+[CLIENT_AUTHENTICATION_LIFECYCLE.md](CLIENT_AUTHENTICATION_LIFECYCLE.md).
+The existing external-token options interface remains extendable and unchanged
+in its required callback; managed construction uses the new
+`ManagedClientAuthenticationOptions` interface. The constructor rejects multiple
+credential owners. Authentication-disabled consumers remain supported.
+
+| Decision | Implementation |
+| --- | --- |
+| Flow/library | Browser code/query with S256 PKCE via oidc-client-ts 3.5; JOSE 5 validates ID signatures and issuer/audience/subject/nonce/lifetime; no browser secret |
+| Classify ownership | Transaction, code exchange, private credentials, refresh and formal local cleanup |
+| Application ownership | Registration/scopes, URL construction, optional provider login parameters, navigation and callback history cleanup |
+| APIs | `beginLogin(): Promise<AuthorizationRequest>`, `completeLogin(returnUrl): Promise<void>`, `logout(): Promise<LocalLogoutResult>` |
+| Persistence | Private sessionStorage namespace by storage key/provider/client/return URI/scopes; reload/navigation survive; separate from application/server state |
+| Tabs | Independent tab logout/credentials; no cross-tab global logout. Opener-created tab storage copies and browser restoration are documented; use noopener for independent tabs |
+| Refresh | On demand, one in-flight exchange per tab/namespace, rotated refresh token replacement, retain omitted refresh/ID token; default 30-second leeway; fail closed on missing/expired/failed refresh |
+| Transactions | One pending, single use, default ten minutes, configurable 60–1800 seconds. State/nonce, return location, expiry, duplicate and optional issuer checks; errors consume it |
+| Logout hint | Capture before credential deletion and return optional `idTokenHint` only after successful cleanup; application owns provider logout URL |
+| Races | Synchronous cancellation before cleanup, serialized protected session saves, generation checks across login/refresh/HTTP/socket operations; public calls retain independent activity |
+| External tokens | Existing callback remains available; local logout cancels client protected activity, application clears its own tokens and constructs a new client after its next login |
+| Server boundary | Gateway validation and trusted context exclusively determine identity/ownership/permissions. No client claims sent as authority; no server revocation added |
+| Providers | Actual Cognito browser validation is recorded below. Okta remains unvalidated; standards compatibility is not a deployed validation claim |
+
+## 15. Managed lifecycle validation — 2026-10-06
+
+The working tree remains uncommitted. No custom domain, production identity
+provider, GitHub workflow, server revocation policy or publication was added.
+
+| Validation | Actual result |
+| --- | --- |
+| Default offline suite | 120 passed: 22 harness/configuration/cleanup checks, 71 unit checks (31 new lifecycle checks), 23 original behavior cases and 4 explicit dual-route noAuth cases |
+| Final focused suite | 71 passed after the final lazy JOSE load, including real local OIDC/JWKS exchanges, invalid state/nonce/signature/issuer/audience/expiry, PKCE failure, code reuse, missing/expired refresh, rotation, cleanup failure, repeated logout, public in-flight results and late HTTP/session/socket/login/refresh races |
+| Builds/typechecks | ESM and CommonJS libraries, all workspace consumers, and the real-browser test application passed |
+| Dependencies | Consolidated npm audit: zero vulnerabilities. Lockfile dry-run consistency check passed. Scoped test YAML-loader override removes GHSA-hp3w-g68c-fv3c; real YAML configuration parsing passed |
+| Packed consumers | External tarball install, legacy and extendable external-token interfaces, managed API types, public/common subpaths, CommonJS and browser bundles passed. Legacy import/construction with TextEncoder absent also passed; JOSE remained unloaded |
+| Legacy AWS regression | 23/23 directly and 23/23 through default CloudFront; real sockets, static hosting, generated IAM and TTL passed |
+| Complete authenticated AWS run | 57 passed: 11 real-browser lifecycle/preflight cases plus all 46 preceding Gateway/ownership/socket cases. Genuine expired tokens and IAM-only background notifications passed |
+| Final browser bundle | All 11 browser cases repeated against the final lazy-loading code using additional disposable users in the same owned pool. Chrome 154.0.8037.98; final source hashes, actual served bundle and bundle hash retained |
+| Browser acceptance | Cognito code/S256 exchange, Gateway-trusted access-token identity, reload, real OAuth refresh rotation without retry grace, socket/local logout, public activity, provider cookie logout and subsequent different-user login/fresh protected session passed on both API paths |
+| Sensitive Lambda logs | 557 entries across 7 owned groups inspected; no raw bearer tokens or ac1 socket credentials found. WebSocket execution tracing remained disabled |
+| Cleanup | Passed for all four deployments, including both failed attempts. Owned stacks/deployment buckets removed; no log groups remained for any recorded owned Lambda function |
+
+Local ignored artifacts:
+
+- Authentication: `.test-results/aws/aws-classify-tests-lifecycle-muwjf2ti-867f08/run.json`.
+- Final browser/code revision: the same directory's `final-managed-browser.json`
+  and `final-managed-browser-bundle.js`; final bundle SHA-256
+  `83dbc7cc1fcedabb31cd3173208f03ced214c4c877a63d00a5e79d41bfcc63db`.
+- Log inspection: the same directory's `sensitive-log-check.json`.
+- Legacy: `.test-results/aws/aws-classify-tests-lifecycle-muwjp4q5-68563d/run.json`.
+- Local results: `.test-results/lifecycle-offline.log`, `lifecycle-unit.log`,
+  `lifecycle-typecheck.log`, `lifecycle-packed.log`, `lifecycle-audit.log`, and
+  `lifecycle-lockfile.log`.
+
+The baseline commit remains `bd948fd4369417c637c1f5e2b6c29c9624b789f9`.
+The parent authentication report captures the initial browser bundle and the
+complete server/external-token matrix. Its supplemental final-browser report
+captures the final client source and lazy JOSE load explicitly. The latter was
+retested with separate synthetic users while the parent run waited for real
+token expiry; its existing users and expiry tokens were not changed. Neither
+report contains passwords, codes, tokens or refresh credentials.
+
+Two deployment attempts failed and were fully cleaned. The first,
+`aws-classify-tests-lifecycle-muwj6myh-463df4`, completed browser Cognito code
+exchange but failed the direct API browser request. An explicit unauthenticated
+OPTIONS fixture route then passed CORS preflight and direct browser calls; that
+route exposes no dispatch and is not added to production includes. The legacy
+attempt `aws-classify-tests-lifecycle-muwjg72m-34527c` failed before cases because
+a duplicate Jest environment option replaced Node export conditions; the merged
+configuration passed the subsequent complete legacy matrix. The local fake-process
+harness also exposed intermittent cleanup timing failures at its 200 ms grace:
+normal shutdown now allows one second, while the stubborn-process forced-kill
+case still uses 200 ms. Production shutdown remains five seconds, and cleanup
+errors now include their underlying messages. Failed runs remain
+failed in their reports rather than being counted as validation successes.
+
+Remaining limits are deliberate: tab-local sessionStorage (including documented
+opener copies/browser restoration), application-owned navigation/history and
+provider registration/scopes, public-client code/query only, on-demand refresh,
+and no immediate server-side token/session revocation or global cross-tab
+logout. Application session callbacks must complete their writes before
+resolving. Managed mode does not add React Native/SSR support. Okta has not been
+validated and must not be described as tested. Provider logout with a mandatory
+OIDC ID-token hint is supported by the return API but was not tested against an
+additional provider; actual Cognito logout uses client_id/logout_uri.

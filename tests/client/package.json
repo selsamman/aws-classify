@@ -10,7 +10,8 @@
     "pretest:online": "npm --prefix ../.. run build",
     "typecheck": "tsc --noEmit",
     "test:unit": "jest --config jest.config.unit.js",
-    "pretest:unit": "npm --prefix ../.. run build"
+    "pretest:unit": "npm --prefix ../.. run build",
+    "test:auth:offline": "jest --config jest.config.auth-offline.js"
   },
   "author": "Sam Elsamman",
   "license": "ISC",

@@ -1,6 +1,6 @@
 // A disposable fixture only. This runner never calls the offline credential setup.
 const {spawn, execFileSync} = require('node:child_process');
-const {mkdirSync, writeFileSync, appendFileSync, readFileSync, readdirSync, existsSync} = require('node:fs');
+const {mkdirSync, writeFileSync, appendFileSync, readFileSync, readdirSync, existsSync, cpSync, copyFileSync, symlinkSync} = require('node:fs');
 const {resolve, join} = require('node:path');
 const {randomBytes, createHash} = require('node:crypto');
 const {parseArgs} = require('node:util');
@@ -45,9 +45,32 @@ function captureRevision(root, directory, label) {
     return {commit: git(['rev-parse', 'HEAD']).trim(), workingTree: git(['status', '--short']).trim(), diffSha256: createHash('sha256').update(diff).digest('hex'), sourceSha256: hashes};
 }
 
+function prepareFixture(reportDir) {
+    const root = resolve(__dirname, '../..');
+    const fixture = join(reportDir, 'fixture');
+    mkdirSync(fixture, {recursive:true});
+    cpSync(join(__dirname, 'src'), join(fixture, 'src'), {recursive:true});
+    cpSync(join(__dirname, 'static'), join(fixture, 'static'), {recursive:true});
+    // Keep fixture function names below AWS's limit even with the longest supported prefix.
+    for (const file of ['functions.yml','functions-authenticated.yml']) {
+        let functions = readFileSync(join(root,'aws-classify-server/yml',file),'utf8');
+        const names = {responseHandler:'http',publicResponseHandler:'public',connectHandler:'connect',disconnectHandler:'disconnect'};
+        functions = functions.replace(/^  name:.*\n/gm,'');
+        for (const [key,name] of Object.entries(names)) functions = functions.replace(`${key}:\n`, `${key}:\n  name: \${self:service}-\${sls:stage}-${name}\n`);
+        writeFileSync(join(fixture, `fixture-${file}`), functions);
+    }
+    for (const file of ['serverless.yml', 'serverless-auth.yml']) {
+        const config = readFileSync(join(__dirname, file), 'utf8').replace('../../aws-classify-server/yml', join(root, 'aws-classify-server/yml')).replace('${self:custom.yml}/functions.yml','fixture-functions.yml').replace('${self:custom.yml}/functions-authenticated.yml','fixture-functions-authenticated.yml');
+        writeFileSync(join(fixture, file), config);
+    }
+    for (const file of ['package.json', 'tsconfig.json', 'auth-resources.yml']) copyFileSync(join(__dirname, file), join(fixture, file));
+    symlinkSync(join(root, 'node_modules'), join(fixture, 'node_modules'), 'dir');
+    return fixture;
+}
+
 async function main() {
     const {values} = parseArgs({options: {
-        suffix: {type: 'string'}, region: {type: 'string'}, profile: {type: 'string'}, cleanup: {type: 'string'},
+        auth: {type: 'boolean'}, suffix: {type: 'string'}, region: {type: 'string'}, profile: {type: 'string'}, cleanup: {type: 'string'},
     }});
     if (values.profile) process.env.AWS_PROFILE = values.profile;
     const prior = values.cleanup && JSON.parse(readFileSync(resolve(values.cleanup), 'utf8'));
@@ -187,10 +210,11 @@ async function main() {
             controller.signal.throwIfAborted();
             await s3.send(new CreateBucketCommand({Bucket: report.deploymentBucket, ...(region === 'us-east-1' ? {} : {CreateBucketConfiguration: {LocationConstraint: region}})}));
             report.deploymentBucketOwned = true; save();
+            const fixtureDir = prepareFixture(reportDir);
             const binary = require('serverless/binary').getBinary().binaryPath;
-            const args = ['--stage', 'dev', '--region', region, `--param=suffix=${suffix}`, `--param=contentBucket=${report.contentBucket}`, `--param=deploymentBucket=${report.deploymentBucket}`, ...(process.env.AWS_PROFILE ? ['--aws-profile', process.env.AWS_PROFILE] : [])];
+            const args = [...(values.auth ? ['--config', 'serverless-auth.yml'] : []), '--stage', 'dev', '--region', region, `--param=suffix=${suffix}`, `--param=contentBucket=${report.contentBucket}`, `--param=deploymentBucket=${report.deploymentBucket}`, ...(values.auth ? [`--param=authDomain=classify-fixture-${createHash('sha256').update(service).digest('hex').slice(0,24)}`] : []), ...(process.env.AWS_PROFILE ? ['--aws-profile', process.env.AWS_PROFILE] : [])];
             const packageDir = join(reportDir, 'package');
-            await command('package', binary, ['package', ...args, '--package', packageDir], __dirname);
+            await command('package', binary, ['package', ...args, '--package', packageDir], fixtureDir);
             const template = JSON.parse(readFileSync(join(packageDir, 'cloudformation-template-update-stack.json'), 'utf8'));
             const statements = Object.values(template.Resources).filter(r => r.Type === 'AWS::IAM::Role').flatMap(r => r.Properties.Policies || []).flatMap(p => p.PolicyDocument.Statement);
             for (const action of ['dynamodb:DeleteItem', 'execute-api:ManageConnections']) {
@@ -198,7 +222,7 @@ async function main() {
             }
             report.checks.generatedIam = 'passed';
             report.stackOwned = true; save(); // absent before our deploy; partial creation also belongs to this run
-            await command('deploy', binary, ['deploy', ...args, '--package', packageDir], __dirname);
+            await command('deploy', binary, ['deploy', ...args, '--package', packageDir], fixtureDir);
             const deployed = await stack();
             if (deployed?.StackStatus !== 'CREATE_COMPLETE' && deployed?.StackStatus !== 'UPDATE_COMPLETE') throw new Error(`Stack not ready: ${deployed?.StackStatus}`);
             report.stackId = deployed.StackId;
@@ -220,10 +244,27 @@ async function main() {
                 if (Date.now() >= deadline) throw new Error('Uploaded static fixture was not served by CloudFront');
                 await delay(2000);
             }
+            if (values.auth) {
+                const {buildSync} = require('esbuild');
+                const bundle = buildSync({entryPoints:[join(__dirname,'managed-browser.ts')],bundle:true,platform:'browser',write:false,
+                    define:{__FIXTURE_CONFIG__:JSON.stringify({issuer:`https://cognito-idp.${region}.amazonaws.com/${report.outputs.AuthUserPoolId}`,
+                        clientId:report.outputs.AuthManagedClientId,domain:new URL(report.outputs.AuthTokenUrl).origin,website,api:TestApiUrl})}}).outputFiles[0].contents;
+                writeFileSync(join(reportDir, 'managed-browser-bundle.js'), bundle);
+                await s3.send(new PutObjectCommand({Bucket:report.contentBucket,Key:'managed.js',Body:bundle,ContentType:'application/javascript',CacheControl:'no-store'}));
+                await s3.send(new PutObjectCommand({Bucket:report.contentBucket,Key:'managed.html',Body:'<!doctype html><meta charset="utf-8"><title>Managed lifecycle fixture</title><body>Loading<script src="/managed.js"></script>',ContentType:'text/html',CacheControl:'no-store'}));
+            }
             report.checks.staticWebsite = 'passed'; save();
             const jest = require.resolve('jest/bin/jest');
             const clientDir = resolve(__dirname, '../client');
-            for (const [label, api] of [['direct-api', TestApiUrl], ['cloudfront-api', `${website}/api/dispatch`]]) {
+            if (values.auth) {
+                recordRevision('authentication');
+                const {runAuthentication} = require('./auth-test');
+                report.checks.authentication = {result:'running', checks:[], count:0}; save();
+                report.checks.authentication = await runAuthentication({outputs: report.outputs, region, signal: controller.signal, log, onCheck: name => {
+                    report.checks.authentication.checks.push(name); report.checks.authentication.count++; save();
+                }});
+                save();
+            } else for (const [label, api] of [['direct-api', TestApiUrl], ['cloudfront-api', `${website}/api/dispatch`]]) {
                 recordRevision(label);
                 await command(label, process.execPath, [jest, '--config', 'jest.config.online.js', '--runInBand', '--json', '--outputFile', join(reportDir, `${label}-results.json`)], clientDir, {TestAPIURL: api}, 10 * 60 * 1000);
                 report.checks[label] = 'passed'; save();
@@ -231,14 +272,14 @@ async function main() {
             const ttl = await db.send(new DescribeTimeToLiveCommand({TableName: TestSessionTable}));
             if (ttl.TimeToLiveDescription.AttributeName !== 'expires' || ttl.TimeToLiveDescription.TimeToLiveStatus !== 'ENABLED') throw new Error('Session TTL is not enabled');
             const data = await db.send(new ScanCommand({TableName: TestSessionTable, ConsistentRead: true, Limit: 10}));
-            if (!data.Items?.length || !data.Items.every(i => Math.abs(Number(i.expires?.N) - Number(i.updated?.N) / 1000 - 86400) < 120)) throw new Error('Saved session expiry does not match the configured 24-hour lifetime');
+            if (!data.Items?.length || !data.Items.filter(i => !i.sessionId.S.startsWith('connection#')).every(i => Math.abs(Number(i.expires?.N) - Number(i.updated?.N) / 1000 - 86400) < 120)) throw new Error('Saved session expiry does not match the configured 24-hour lifetime');
             report.checks.ttl = 'passed'; report.result = 'passed'; save();
             log('Direct API, default CloudFront, WebSocket callbacks, IAM and TTL checks passed.');
         }
     } catch (e) {
         failure = e;
         if (prior) report.recoveryError = `${e.name}: ${e.message}`;
-        else { report.result = 'failed'; report.error = `${e.name}: ${e.message}`; }
+        else { if (report.checks.authentication?.result === 'running') report.checks.authentication.result = 'failed'; report.result = 'failed'; report.error = `${e.name}: ${e.message}`; }
         if (authorized || !prior) save();
     } finally {
         // Diagnostics and cleanup run without the interruption signal.
@@ -258,4 +299,4 @@ async function main() {
 }
 if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
 
-module.exports = {describeActiveStack, validateCleanupManifest, captureRevision};
+module.exports = {describeActiveStack, validateCleanupManifest, captureRevision, prepareFixture};

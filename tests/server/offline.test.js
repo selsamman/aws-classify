@@ -72,7 +72,7 @@ async function assertReleased(ports) {
 async function options(mode) {
     return {
         ports: await freePorts(), command: process.execPath, commandArgs: [fixture],
-        env: { HARNESS_MODE: mode }, log: () => {}, startupTimeoutMs: 5000, shutdownTimeoutMs: 200,
+        env: { HARNESS_MODE: mode }, log: () => {}, startupTimeoutMs: 5000, shutdownTimeoutMs: 1000,
     };
 }
 
@@ -134,6 +134,7 @@ test('refuses occupied ports without stopping their owner', async () => {
 
 test('forces shutdown of a stubborn process and its child', { skip: process.platform === 'win32' }, async () => {
     const settings = await options('stubborn');
+    settings.shutdownTimeoutMs = 200;
     const offline = await startOffline(settings);
     await offline.stop();
     await assertReleased(settings.ports);

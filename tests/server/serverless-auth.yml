@@ -3,6 +3,11 @@ frameworkVersion: '4'
 
 custom:
 
+  awsClassify:
+    authorizer:
+      name: fixtureJwt
+      scopes: [aws.cognito.signin.user.admin, fixture/invoke]
+    publicSuffix: Public
   directories:
     responseHandlers: "src/server-responses/index"
     staticWebsite: "./static"
@@ -26,13 +31,22 @@ plugins:
 
 provider:
   name: aws
+  httpApi:
+    cors: true
+    authorizers:
+      fixtureJwt:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: !Join ['', ['https://cognito-idp.', !Ref AWS::Region, '.amazonaws.com/', !Ref AuthUserPool]]
+        audience: [!Ref AuthManagedClient, !Ref AuthUserClient, !Ref AuthMachineClient, !Ref WrongIssuerClient]
   runtime: nodejs22.x
   region: ${opt:region, 'us-east-1'}
   deploymentBucket:
     name: ${param:deploymentBucket, 'aws-classify-tests-local-artifacts'}
   websocketsApiRouteSelectionExpression: $request.body.action
   logs:
-    websocket: true
+    websocket:
+      fullExecutionData: false
   environment:
     APIG_ENDPOINT: ${file(${self:custom.yml}/apig.yml)}
     DOMAIN: ${self:custom.domainName}
@@ -43,11 +57,25 @@ provider:
       - ${file(${self:custom.yml}/provider-iam.yml)}
 
 functions:
-  - ${file(${self:custom.yml}/functions.yml)}
+  - ${file(${self:custom.yml}/functions-authenticated.yml)}
+  - preflight:
+      name: ${self:service}-${sls:stage}-options
+      handler: src/server-responses/index.preflight
+      events:
+        - httpApi:
+            path: /api/dispatch
+            method: OPTIONS
+  - backgroundNotify:
+      name: ${self:service}-${sls:stage}-notify
+      handler: src/server-responses/index.backgroundNotify
+      environment:
+        AWS_CLASSIFY_AUTHENTICATION: 'true'
+        AWS_CLASSIFY_PUBLIC_SUFFIX: Public
 
 resources:
-  - ${file(${self:custom.yml}/resources-website.yml)}
+  - ${file(${self:custom.yml}/resources-website-authenticated.yml)}
   - ${file(${self:custom.yml}/resources-dynamodb.yml)}
+  - ${file(auth-resources.yml)}
   - Outputs:
       TestApiUrl:
         Value:

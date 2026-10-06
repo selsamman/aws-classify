@@ -1,15 +1,110 @@
-import type {LambdaRequest, LambdaResponse, EndPointsLogging} from "aws-classify-common";
+import type {LambdaRequest, LambdaResponse, EndPointsLogging, ClientAuthenticationOptions, ManagedClientAuthenticationOptions, SocketAuthorization, AuthorizationRequest, LocalLogoutResult} from "aws-classify-common";
 import {deserialize, serialize} from "js-freeze-dry";
+import {validatePublicSuffix} from "aws-classify-common";
 import axios from "axios";
+import {ManagedAuthentication, AuthenticationChangedError, LoginRequiredError} from "./ManagedAuthentication";
 
 export class ClassifyClient {
 
     // eslint-disable-next-line no-restricted-globals
     constructor(
-        getSession : () => Promise<string>, setSession : (sessionId: string) => Promise<void>, postURL = '/api/dispatch') {
+        getSession : () => Promise<string>, setSession : (sessionId: string) => Promise<void>, postURL = '/api/dispatch', authentication?: ClientAuthenticationOptions | ManagedClientAuthenticationOptions) {
         this.postURL = postURL;
+        if (authentication) {
+            validatePublicSuffix(authentication.publicSuffix);
+            if (!!authentication.managed === (typeof authentication.getAccessToken === 'function')) throw new Error('Supply exactly one of managed or getAccessToken');
+            if (!!authentication.getPublicSession !== !!authentication.setPublicSession) throw new Error('Supply both public session callbacks');
+            this.authentication = {...authentication};
+        }
         this.getSession = getSession;
         this.setSession = setSession;
+        if (authentication?.managed) this.managed = new ManagedAuthentication(authentication.managed, () => this.invalidateAuthentication());
+    }
+    private readonly authentication?: ClientAuthenticationOptions | ManagedClientAuthenticationOptions;
+    private readonly managed?: ManagedAuthentication;
+    private generation = 0;
+    private protectedBlocked = false;
+    private sessionQueue: Promise<void> = Promise.resolve();
+    private cleanup: Promise<void> = Promise.resolve();
+    private cancelSocketOpen?: () => void;
+    private invalidateAuthentication() {
+        ++this.generation;
+        this.protectedBlocked = true;
+        const socket = this.socket;
+        this.socket = undefined;
+        this.socketRequested = false;
+        this.webSocketURL = '';
+        this.cancelSocketOpen?.();
+        this.cancelSocketOpen = undefined;
+        let closeError: unknown;
+        try { socket?.close(); } catch (error) { closeError = error; }
+        const cleanup = this.sessionQueue.then(async () => {
+            await this.setSession('');
+            if (closeError) throw closeError;
+        });
+        this.cleanup = cleanup;
+        this.sessionQueue = cleanup.catch(() => {});
+        // Keep the rejection observable through lifecycle/request calls, without an unhandled rejection.
+        void cleanup.catch(() => {});
+    }
+    private assertCurrent(generation: number, isPublic = false) {
+        if (this.authentication && !isPublic && generation !== this.generation) throw new AuthenticationChangedError();
+    }
+    private async saveProtectedSession(id: string, generation: number) {
+        if (!this.authentication) return this.setSession(id);
+        const save = this.sessionQueue.then(async () => {
+            this.assertCurrent(generation);
+            await this.setSession(id);
+            this.assertCurrent(generation);
+        });
+        this.sessionQueue = save.catch(() => {});
+        return save;
+    }
+    async beginLogin(): Promise<AuthorizationRequest> {
+        if (!this.managed) throw new Error('Managed authentication required');
+        this.managed.clear();
+        const generation = this.generation;
+        await this.cleanup;
+        this.assertCurrent(generation);
+        return this.managed.beginLogin();
+    }
+    async completeLogin(returnUrl: string): Promise<void> {
+        if (!this.managed) throw new Error('Managed authentication required');
+        this.managed.prepareCompletion();
+        const generation = this.generation;
+        await this.cleanup;
+        this.assertCurrent(generation);
+        await this.managed.completeLogin(returnUrl);
+        this.assertCurrent(generation);
+        this.protectedBlocked = false;
+    }
+    async logout(): Promise<LocalLogoutResult> {
+        if (!this.authentication) throw new Error('Authentication required');
+        let idTokenHint: string | undefined;
+        try {
+            if (this.managed) idTokenHint = this.managed.clear();
+            else this.invalidateAuthentication();
+        } catch (error) {
+            await this.cleanup;
+            throw error;
+        }
+        await this.cleanup;
+        return Object.freeze({idTokenHint});
+    }
+    private publicSession = '';
+    private isPublic(method: string) { return !!this.authentication && method.endsWith(this.authentication.publicSuffix); }
+    private async requestHeaders(isPublic = false, generation = this.generation) {
+        const headers: Record<string, string> = {'Content-Type': 'text/plain'};
+        if (this.authentication && !isPublic) {
+            await this.cleanup;
+            this.assertCurrent(generation);
+            if (this.protectedBlocked) throw new LoginRequiredError();
+            const token = this.managed ? await this.managed.getAccessToken() : await this.authentication.getAccessToken!();
+            this.assertCurrent(generation);
+            if (!token || /[\r\n]/.test(token)) throw new Error('Access token required');
+            headers.Authorization = `Bearer ${token}`;
+        }
+        return headers;
     }
     getSession;
     setSession;
@@ -48,104 +143,70 @@ export class ClassifyClient {
         this.listener = listener;
     }
 
-    async initSocket(classes : any = {}) : Promise<boolean>{
-
-        if (this.socket || this.socketRequested)
-            return true;
-
+    async initSocket(classes: any = {}): Promise<boolean> {
+        const generation = this.generation;
+        if (this.authentication && this.protectedBlocked) throw new LoginRequiredError();
+        if (this.socket || this.socketRequested) return true;
         this.socketRequested = true;
-
         try {
-            const request: LambdaRequest = {
-                interfaceName: '$WebSocket',
-                methodName: '$authorize',
-                args: [],
-                sessionId: await this.getSession()
-            };
-            const body = serialize(request);
-
-            if (this.logLevel.calls)
-                this.log(`Endpoint ${request.interfaceName}.${request.methodName} requesting`);
-
-            // Make requests and parse response
-            this.log(`contacting ${this.postURL}`);
-            const rawResponse = await axios.post(
-                this.postURL,
-                body,
-                {
-                    headers: {'Content-Type': 'text/plain'},
-                    transformRequest: [],
-                    transformResponse: []
-                }
-            );
-
-            const response: LambdaResponse = deserialize(rawResponse.data, classes as LambdaResponse);
-            if (response.sessionId) {
-
-                this.webSocketURL = response.data;
-                this.setSession(response.sessionId);
-
-                if (this.logLevel.calls)
-                    this.log(`Endpoint ${request.interfaceName}.${request.methodName} responded`);
-
-                this.socket = new WebSocket(this.webSocketURL, [
-                    `${response.sessionId}`
-                ]);
-
-                this.socket.onerror = error => {
-                    this.log(error.toString());
-                    this.socket?.close();
-                };
-
-                this.socket.addEventListener('message', (ev: MessageEvent) => {
-                    try {
-                        const request = deserialize(ev.data, classes) as LambdaRequest;
-                        const methodKey = `${request.interfaceName}.${request.methodName}`;
-                        const callback = this.messageCallback[methodKey];
-                        if (callback)
-                            callback(request);
-                        else
-                            this.log(`unknown websocket request ${methodKey}`);
-                    } catch (e) {
-                        this.log(`${e} on Websocket message parsing`)
-                    }
-                });
-
-                this.socket.addEventListener('error',  (_event) => {
-                    this.log('Websocket Error')
-                });
-
-                this.socket.addEventListener('close',  event => {
-                    this.log(`Websocket closing ${event.code}`);
-                    if (this.eventDisconnect)
-                        this.eventDisconnect();
-                    this.socket = undefined;
-                });
+            const sessionId = await this.getSession();
+            const headers = await this.requestHeaders(false, generation);
+            this.assertCurrent(generation);
+            const request: LambdaRequest = {interfaceName: '$WebSocket', methodName: '$authorize', args: [], sessionId};
+            const rawResponse = await axios.post(this.postURL, serialize(request), {headers, transformRequest: [], transformResponse: []});
+            this.assertCurrent(generation);
+            const response: LambdaResponse = deserialize(rawResponse.data, classes);
+            if (response.exception) throw new Error(response.exception);
+            if (!response.sessionId) return false;
+            const authorization = response.data as SocketAuthorization;
+            if (this.authentication && (!authorization?.credential || !authorization.url)) throw new Error('Connection credential required');
+            await this.saveProtectedSession(response.sessionId, generation);
+            this.assertCurrent(generation);
+            this.webSocketURL = this.authentication ? authorization.url : response.data;
+            const socket = new WebSocket(this.webSocketURL, [this.authentication ? authorization.credential : response.sessionId]);
+            this.socket = socket;
+            const current = () => this.socket === socket && (!this.authentication || generation === this.generation);
+            socket.onerror = () => { if (current()) socket.close(); };
+            socket.addEventListener('message', (event: MessageEvent) => {
+                if (!current()) return;
                 try {
-                    await new Promise((resolve, reject) => {
-                        const timeout = setTimeout(() => reject('Timed out waiting for socket open'), 5000);
-                        this.socket?.addEventListener('open', (_event) => {
-                            this.log("WebSocket open");
-                            this.socketRequested = false;
-                            if (this.eventConnect)
-                                this.eventConnect();
-                            clearTimeout(timeout)
-                            resolve(true);
-                        });
+                    const notification = deserialize(event.data, classes) as LambdaRequest;
+                    const callback = this.messageCallback[`${notification.interfaceName}.${notification.methodName}`];
+                    if (callback) callback(notification);
+                } catch (error) { this.log(`${error} on Websocket message parsing`); }
+            });
+            socket.addEventListener('close', () => {
+                if (!current()) return;
+                this.socket = undefined;
+                if (this.eventDisconnect) this.eventDisconnect();
+            });
+            try {
+                await new Promise<void>((resolve, reject) => {
+                    const timeout = setTimeout(() => {finish(); reject(new Error('Timed out waiting for socket open'));}, 5000);
+                    const finish = () => {
+                        clearTimeout(timeout);
+                        if (this.cancelSocketOpen === cancel) this.cancelSocketOpen = undefined;
+                    };
+                    const cancel = () => {finish(); reject(new AuthenticationChangedError());};
+                    this.cancelSocketOpen = cancel;
+                    socket.addEventListener('open', () => {
+                        if (!current()) {cancel(); return;}
+                        finish();
+                        this.socketRequested = false;
+                        if (this.eventConnect) this.eventConnect();
+                        resolve();
                     });
-                } catch (e : any) {
-                    this.log(e.toString());
-                    return false;
-                }
+                });
+                this.assertCurrent(generation);
                 return true;
-            }
-            else {
-                this.log('sessionId not returned from Lambda');
+            } catch (error) {
+                socket.close();
+                if (this.socket === socket) this.socket = undefined;
+                this.assertCurrent(generation);
                 return false;
             }
         } finally {
-            // A failed authorization/open attempt must permit another attempt.
-            this.socketRequested = false;
+            if (!this.authentication || generation === this.generation) this.socketRequested = false;
         }
     }
 
@@ -203,13 +264,16 @@ export class ClassifyClient {
 
             (requestObj as any)[methodName] = async (...args: any) => {
 
+                const generation = this.generation;
+                const isPublic = this.isPublic(methodName);
                 try {
-
                     const request: LambdaRequest = {
                         interfaceName: interfaceName,
                         args, methodName,
-                        sessionId: await this.getSession()
+                        sessionId: isPublic ? await (this.authentication?.getPublicSession?.() ?? Promise.resolve(this.publicSession)) : await this.getSession()
                     };
+                    const headers = await this.requestHeaders(isPublic, generation);
+                    this.assertCurrent(generation, isPublic);
                     const body = serialize(request, classes);
 
                     // Log request
@@ -220,20 +284,27 @@ export class ClassifyClient {
 
                     // Make requests and parse response
 
+                    this.assertCurrent(generation, isPublic);
                     const rawResponse = await axios.post(
-                        this.postURL,
+                        isPublic ? (this.authentication?.publicURL || `${this.postURL.replace(/\/$/, '')}/public`) : this.postURL,
                         body,
                         {
-                            headers: {'Content-Type' : 'text/plain'},
+                            headers,
                             transformRequest: [],
                             transformResponse: []
                         }
                      );
+                    this.assertCurrent(generation, isPublic);
                     const response: LambdaResponse = deserialize(rawResponse.data, classes as LambdaResponse);
 
-                    if (response.sessionId)
-                        await this.setSession(response.sessionId);
+                    if (response.sessionId) {
+                        if (isPublic) {
+                            this.publicSession = response.sessionId;
+                            await this.authentication?.setPublicSession?.(response.sessionId);
+                        } else await this.saveProtectedSession(response.sessionId, generation);
+                    }
 
+                    this.assertCurrent(generation, isPublic);
                     // Log response
                     if (this.logLevel.data)
                         this.log(`Endpoint ${interfaceName}.${methodName}} responded with ${rawResponse}`);
@@ -245,9 +316,11 @@ export class ClassifyClient {
                         throw new Error(response.exception);
 
                     // Pass side-data to listener
+                    this.assertCurrent(generation, isPublic);
                     if (response.cargo && this.listener)
                         this.listener(response.cargo);
 
+                    this.assertCurrent(generation, isPublic);
                     return response.data;
 
                     // Catch any exception, so it can be logged and then rethrown

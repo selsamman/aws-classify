@@ -1,7 +1,8 @@
+import type {RequestContext} from "aws-classify-common";
 import {ClassifyResponse} from "./ClassifyResponse";
 
 export interface ClassDef<ServerClass extends ClassifyResponse, ClientClass> {
     serverClass: new () => ServerClass;
     clientClass: new () => ClientClass;
-    authorizer: ((endPoint: ServerClass, method: string, args: IArguments) => Promise<boolean>) | undefined;
+    authorizer: ((endPoint: ServerClass, method: string, args: IArguments, context?: RequestContext) => Promise<boolean>) | undefined;
 }
