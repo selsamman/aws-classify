@@ -7,3 +7,8 @@ node_modules/
 
 # Disposable AWS validation reports and deployment packages
 .test-results/
+
+# Generated user-guide site and Docusaurus cache
+usersguide/build/
+usersguide/.docusaurus/
+usersguide/static/config/

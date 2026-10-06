@@ -13,8 +13,7 @@
     "tests/client"
   ],
   "devDependencies": {
-    "@istanbuljs/load-nyc-config": "^1.1.0",
-    "bisync": "^0.9.9"
+    "@istanbuljs/load-nyc-config": "^1.1.0"
   },
   "scripts": {
     "install:tests": "npm ci --ignore-scripts && npm rebuild serverless && npm run build",
@@ -24,12 +23,15 @@
     "audit": "npm audit",
     "test:aws": "npm run build && npm run test:aws --workspace @aws-classify-tests/server --",
     "test:packed": "npm run build && node tests/packed-consumer.js",
-    "test:aws:auth": "npm run test:aws -- --auth"
+    "test:aws:auth": "npm run test:aws -- --auth",
+    "guide:install": "npm --prefix usersguide ci --workspaces=false",
+    "guide:dev": "npm --prefix usersguide start",
+    "guide:build": "npm --prefix usersguide run build",
+    "guide:serve": "npm --prefix usersguide run serve",
+    "guide:check": "npm --prefix usersguide run check",
+    "guide:publish": "npm --prefix usersguide run deploy"
   },
   "overrides": {
-    "bisync": {
-      "chokidar": "^4.0.3"
-    },
     "@istanbuljs/load-nyc-config": {
       "js-yaml": "^4.3.2"
     }
