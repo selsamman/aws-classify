@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Add browser login | aws-classify</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://selsamman.github.io/aws-classify/guides/authentication/"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Add browser login | aws-classify"><meta data-rh="true" name="description" content="Protect dispatch with API Gateway and manage standard OIDC browser login, refresh and local logout."><meta data-rh="true" property="og:description" content="Protect dispatch with API Gateway and manage standard OIDC browser login, refresh and local logout."><link data-rh="true" rel="icon" href="/aws-classify/img/logo.svg"><link data-rh="true" rel="canonical" href="https://selsamman.github.io/aws-classify/guides/authentication/"><link data-rh="true" rel="alternate" href="https://selsamman.github.io/aws-classify/guides/authentication/" hreflang="en"><link data-rh="true" rel="alternate" href="https://selsamman.github.io/aws-classify/guides/authentication/" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Add browser login","item":"https://selsamman.github.io/aws-classify/guides/authentication"}]}</script><link rel="stylesheet" href="/aws-classify/assets/css/styles.19c74a1e.css">
-<script src="/aws-classify/assets/js/runtime~main.fbf8f6df.js" defer="defer"></script>
+<script src="/aws-classify/assets/js/runtime~main.452a3334.js" defer="defer"></script>
 <script src="/aws-classify/assets/js/main.2e6309ad.js" defer="defer"></script>
 </head>
 <body>
@@ -15,9 +15,6 @@
 is calling its protected operations. API Gateway validates access tokens;
 aws-classify exposes the resulting trusted identity and keeps application
 sessions bound to that identity. Your application still chooses member permissions.</p>
-<div class="theme-admonition theme-admonition-info admonition_xJq3 alert alert--info"><div class="admonitionHeading_Gvgb"><span class="admonitionIcon_Rf37"><svg viewBox="0 0 14 16"><path fill-rule="evenodd" d="M7 2.3c3.14 0 5.7 2.56 5.7 5.7s-2.56 5.7-5.7 5.7A5.71 5.71 0 0 1 1.3 8c0-3.14 2.56-5.7 5.7-5.7zM7 1C3.14 1 0 4.14 0 8s3.14 7 7 7 7-3.14 7-7-3.14-7-7-7zm1 3H6v5h2V4zm0 6H6v2h2v-2z"></path></svg></span>Release status</div><div class="admonitionContent_BuS1"><p>These APIs describe the current source implementation. The managed lifecycle and
-authenticated templates have not yet been published to npm. See
-<a class="" href="/aws-classify/repository/setup/">repository setup</a> to evaluate a packed source build.</p></div></div>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="protect-the-backend">Protect the backend<a href="#protect-the-backend" class="hash-link" aria-label="Direct link to Protect the backend" title="Direct link to Protect the backend" translate="no">​</a></h2>
 <p>Configure a JWT authorizer for your provider&#x27;s issuer and API audience. Use the
 authenticated functions include and the authenticated CloudFront template.
