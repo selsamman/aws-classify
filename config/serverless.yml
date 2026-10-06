@@ -1,0 +1,46 @@
+service: my-classify-app
+frameworkVersion: '4'
+
+custom:
+  directories:
+    responseHandlers: src/responses/index
+    includeFiles: ../node_modules/aws-classify-server/yml
+  yml: ${self:custom.directories.includeFiles}
+  stage: ${opt:stage, 'dev'}
+  # A session-table namespace; it does not require a DNS name.
+  domainName: ${self:service}-${self:custom.stage}
+  bucketName: ${self:service}-${self:custom.stage}-${aws:accountId}
+  serverless-offline:
+    host: 127.0.0.1
+    httpPort: 4000
+    websocketPort: 3001
+    lambdaPort: 3002
+    useInProcess: true
+    localEnvironment: true
+
+plugins:
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: ${opt:region, 'us-east-1'}
+  websocketsApiRouteSelectionExpression: $request.body.action
+  logs:
+    websocket:
+      fullExecutionData: false
+  environment:
+    APIG_ENDPOINT: ${file(${self:custom.yml}/apig.yml)}
+    DOMAIN: ${self:custom.domainName}
+    DD_REGION: ${self:provider.region}
+  iam:
+    role:
+      statements:
+        - ${file(${self:custom.yml}/provider-iam.yml)}
+
+functions:
+  - ${file(${self:custom.yml}/functions.yml)}
+
+resources:
+  - ${file(${self:custom.yml}/resources-website.yml)}
+  - ${file(${self:custom.yml}/resources-dynamodb.yml)}
