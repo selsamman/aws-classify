@@ -10,6 +10,12 @@ published to npm.
 
 ## Configure publishing once
 
+Each library's `package.json` identifies the same GitHub repository using
+`repository.url`, with `repository.directory` pointing to its workspace folder.
+The repository URL must match the GitHub repository running the publish workflow.
+If you maintain a fork, update this metadata as well as the trusted publisher
+settings below.
+
 For each npm package—`aws-classify-common`, `aws-classify-client` and
 `aws-classify-server`—configure a GitHub trusted publisher with these values:
 

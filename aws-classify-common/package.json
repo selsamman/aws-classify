@@ -14,7 +14,11 @@
     "build:esm": "tsc",
     "build:cjs": "tsc --module commonjs --outDir lib/cjs"
   },
-  "repository": "https://github.com/selsamman/aws-classify",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/selsamman/aws-classify.git",
+    "directory": "aws-classify-common"
+  },
   "author": "Sam Elsamman",
   "license": "MIT",
   "devDependencies": {

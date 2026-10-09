@@ -9,6 +9,12 @@ The user-facing walkthrough is `usersguide/content/repository/releases.md`.
 
 ## Initial configuration
 
+Each public package declares the Git repository URL
+`git+https://github.com/selsamman/aws-classify.git` in `repository.url`, with its
+workspace folder in `repository.directory`. The repository URL must match the
+GitHub repository performing the trusted publication. These fields are included
+in the packed package metadata.
+
 Configure a trusted publisher on **each** of the three npm packages:
 
 - GitHub owner `selsamman`, repository `aws-classify`, workflow `publish.yml`.
