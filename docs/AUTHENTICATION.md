@@ -174,6 +174,19 @@ session. There is no automatic claim or migration of legacy state. Anonymous
 calls cannot read a protected session's interface state. Session TTL is storage
 cleanup; all authenticated authorization checks explicitly enforce expiry.
 
+### Concurrent session mutations
+
+Session state is not a concurrency-control or transaction mechanism. Two
+invocations for the same session can restore the same saved state, make
+independent changes, and save in either order; the later save wins. This is
+normally acceptable for UI continuity, but do not use session fields as the
+authority for a one-time token, rate limit, remaining quota, payment,
+entitlement, or other security-sensitive decision. A caller with a valid token
+can intentionally make concurrent requests. Store and conditionally update such
+state in an application datastore with the transaction or conditional-write
+semantics the decision requires. This also applies when a browser request and a
+trusted background operation update the same session.
+
 `initSocket()` makes the protected `$WebSocket.$authorize` request with a current
 access token. In authenticated mode it returns a `SocketAuthorization` object:
 `{url, credential, expiresAt}` plus the owned session ID. Legacy mode retains its

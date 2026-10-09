@@ -18,13 +18,16 @@ const httpHandler = async (event: HttpEvent, context : Context, entry: 'protecte
         };
     } catch (err : any) {
         //console.log(`request.body = ${event.body}`);
-        console.log('Dispatch failed');
+        // Do not reflect parse, database, or framework errors to an untrusted caller.
+        // Operators still receive the original error in Lambda's logs.
+        console.error('Dispatch failed', err);
         return {
             statusCode: 200,
             headers: {'Cache-Control': 'no-store'},
             body: serialize({
                 data: undefined,
-                exception: `Internal Server Error (${err}) - see log at ${new Date()}`,
+                // Keep the existing serialized-error / HTTP-200 contract for clients.
+                exception: 'Internal Server Error',
                 cargo: undefined,
                 sessionId: undefined
             })
