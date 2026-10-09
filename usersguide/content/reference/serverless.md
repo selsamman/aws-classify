@@ -50,7 +50,6 @@ custom:
     authorizer:
       name: applicationJwt
       scopes: [example/invoke]
-    publicSuffix: Public
 ```
 
 The name must refer to an authorizer defined under `provider.httpApi.authorizers`.

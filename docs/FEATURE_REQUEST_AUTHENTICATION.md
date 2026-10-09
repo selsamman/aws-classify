@@ -168,21 +168,20 @@ In authenticated mode, supply these framework function definitions:
 
 | Export | Route | Gateway authorizer | Permitted calls |
 | --- | --- | --- | --- |
-| `responseHandler` | `ANY /api/dispatch` | Application-supplied | Exposed members without the public suffix |
-| `publicResponseHandler` | `ANY /api/dispatch/public` | None | Exposed members with the public suffix |
+| `responseHandler` | `ANY /api/dispatch` | Application-supplied | All exposed members except those explicitly public |
+| `publicResponseHandler` | `ANY /api/dispatch/public` | None | Explicitly public exposed members |
 
 Both handlers share the core dispatch implementation. Adding application members
 must not create additional Gateway routes or Lambda definitions.
 
-`custom.awsClassify.publicSuffix` configures the convention, with `Public` as
-the architecture's example. Client routing uses the configured suffix. Server
-enforcement independently uses the fixed entry point, never a payload flag:
+`@Public()` on a shared request-class method marks it public. Plain JavaScript
+applications may use matching `publicMethods` lists at server registration and
+client construction. Server enforcement independently uses the fixed entry
+point, never a payload flag:
 
 - Public dispatch rejects non-public members before invocation.
-- Authenticated dispatch rejects public-suffixed members, even with a valid token.
-- A matching suffix does not make an otherwise unexposed method callable.
-- Both client and server use the same convention, including explicit handling
-  of invalid or ambiguous suffix configuration.
+- Authenticated dispatch rejects explicitly public members, even with a valid token.
+- A public declaration does not make an otherwise unexposed method callable.
 
 The framework's internal `$WebSocket.$authorize` operation must use protected
 dispatch in authenticated mode. Define its treatment explicitly; it must not
@@ -214,7 +213,6 @@ custom:
       name: applicationJwt
       scopes:
         - example/invoke
-    publicSuffix: Public
 ```
 
 The names and scope above are illustrative, not framework defaults or GramSurfer

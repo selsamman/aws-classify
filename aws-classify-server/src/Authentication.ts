@@ -2,7 +2,6 @@ import type {APIGatewayProxyEvent, APIGatewayProxyEventV2} from 'aws-lambda';
 import type {AuthenticatedIdentity, RequestContext} from 'aws-classify-common';
 export type HttpEvent = APIGatewayProxyEvent | APIGatewayProxyEventV2;
 export interface ServerAuthenticationOptions {
-    publicSuffix: string;
     connectionCredentialSeconds?: number;
     /** Adapt ONLY the trusted requestContext.authorizer emitted by a configured Gateway authorizer. */
     identityAdapter?: (authorizer: unknown) => AuthenticatedIdentity | undefined;

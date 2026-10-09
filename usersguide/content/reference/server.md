@@ -51,8 +51,7 @@ expires afterward; it does not belong in persisted response state.
 | `hasScope(name)` | Checks the trusted granted scopes |
 
 Default identity comes only from Gateway JWT-authorizer context. Another
-compatible authorizer can use `configureAuthentication({publicSuffix,
-identityAdapter})`; the adapter receives only Gateway's trusted authorizer
+compatible authorizer can use `configureAuthentication({identityAdapter})`; the adapter receives only Gateway's trusted authorizer
 context. The application must configure an authorizer that really establishes
 the identity. Client arguments, restored state and `setUserId()` are not identity
 sources.

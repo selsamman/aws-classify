@@ -7,7 +7,6 @@ custom:
     authorizer:
       name: fixtureJwt
       scopes: [aws.cognito.signin.user.admin, fixture/invoke]
-    publicSuffix: Public
   directories:
     responseHandlers: "src/server-responses/index"
     staticWebsite: "./static"
@@ -70,7 +69,6 @@ functions:
       handler: src/server-responses/index.backgroundNotify
       environment:
         AWS_CLASSIFY_AUTHENTICATION: 'true'
-        AWS_CLASSIFY_PUBLIC_SUFFIX: Public
 
 resources:
   - ${file(${self:custom.yml}/resources-website-authenticated.yml)}

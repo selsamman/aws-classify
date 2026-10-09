@@ -54,11 +54,12 @@ Both authenticated modes accept:
 
 | Option | Meaning |
 | --- | --- |
-| `publicSuffix` | Required nonempty identifier suffix; must match server configuration |
 | `publicURL` | Optional public dispatch URL; defaults to protected URL plus `/public` |
+| `publicMethods` | Plain-JavaScript fallback list matching `registerResponse(..., {publicMethods})` |
 | `getPublicSession`, `setPublicSession` | Optional paired callbacks for separate anonymous session persistence |
 
-Public calls are identified by the exposed method suffix. They omit Authorization
+Public calls are identified by `@Public()` on the shared request class, or by the
+plain-JavaScript fallback list. They omit Authorization
 and use an independent session, in client-local memory unless those callbacks
 are supplied. Never share protected and public session storage.
 

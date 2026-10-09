@@ -29,11 +29,11 @@ class Response extends Request {async invoke() {return b();}}
 const server = new ClassifyServerless();
 server.registerResponse(Response, async (_endpoint, _method, _args) => true);
 interface ExtendedExternalOptions extends ClientAuthenticationOptions {applicationPolicy?: boolean}
-const options: ExtendedExternalOptions = {publicSuffix:'Public', getAccessToken:async () => 'token'};
+const options: ExtendedExternalOptions = {getAccessToken:async () => 'token'};
 new ClassifyClient(async () => '',async () => {},'/api/dispatch',options);
 const managed: ManagedAuthenticationOptions = {issuer:'https://issuer.example', clientId:'browser', redirectUri:'https://app.example/return', scopes:['openid','example/invoke']};
 if (typeof window !== 'undefined') {
-    const client = new ClassifyClient(async () => '',async () => {},'/api/dispatch',{publicSuffix:'Public',managed});
+    const client = new ClassifyClient(async () => '',async () => {},'/api/dispatch',{managed});
     const begin: Promise<AuthorizationRequest> = client.beginLogin();
     const finish: Promise<void> = client.completeLogin('https://app.example/return');
     const logout: Promise<LocalLogoutResult> = client.logout();
@@ -61,9 +61,9 @@ assert.equal(require.cache[require.resolve('jose')],undefined);
 global.TextEncoder = nativeEncoder;
 const resolver=require('aws-classify-server/yml/authentication-config');
 (async () => {
-  const config={authorizer:{name:'application',scopes:['example/invoke']},publicSuffix:'Public'};
+  const config={authorizer:{name:'application',scopes:['example/invoke']}};
   const result=await resolver({resolveVariable:async key => key.includes('custom.awsClassify') ? config : key.includes('httpApi.authorizers') ? {application:{type:'jwt'}} : null});
-  assert.deepEqual(result,config);
+  assert.deepEqual(result,{authorizer:config.authorizer});
   await assert.rejects(resolver({resolveVariable:async () => null}),/requires an authorizer/);
   assert.equal(typeof require('aws-classify-server').publicResponseHandler,'function');
 })().catch(error => {console.error(error); process.exitCode=1;});

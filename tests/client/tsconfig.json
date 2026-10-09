@@ -13,6 +13,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
+    "experimentalDecorators": true,
     "outDir": "build",
     "types": [
       "jest",

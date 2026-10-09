@@ -224,7 +224,7 @@ async function runAuthentication({outputs: o, region, signal, log, onCheck = () 
                 global.WebSocket = WebSocket;
                 class Request {static interfaceName = 'AuthRequest'; async inspect() {} async inspectPublic() {}}
                 let clientSession = '', reads = 0;
-                const client = new ClassifyClient(async () => clientSession, async id => {clientSession=id;}, api, {publicSuffix:'Public', getAccessToken: async () => {reads++; return a();}});
+                const client = new ClassifyClient(async () => clientSession, async id => {clientSession=id;}, api, {publicMethods:['inspectPublic'], getAccessToken: async () => {reads++; return a();}});
                 client.setLogger(() => {}); const request = client.createRequest(Request);
                 assert.equal((await request.inspect()).identity.subject, claims(a()).sub); const protectedSession = clientSession;
                 assert.equal((await request.inspectPublic()).identity, undefined); assert.equal(clientSession, protectedSession); assert.equal(reads, 1);

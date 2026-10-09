@@ -30,7 +30,6 @@ custom:
     authorizer:
       name: applicationJwt
       scopes: [example/invoke, example/alternate] # optional
-    publicSuffix: Public
 
 provider:
   httpApi:
@@ -60,14 +59,18 @@ The two fixed HTTP entry points share dispatch code:
 
 | Handler | Route | Permitted members |
 | --- | --- | --- |
-| `responseHandler` | `ANY /api/dispatch` | Exposed methods without the suffix; protected by the supplied Gateway authorizer |
-| `publicResponseHandler` | `ANY /api/dispatch/public` | Exposed methods ending with the suffix; no authorizer |
+| `responseHandler` | `ANY /api/dispatch` | All exposed methods except those explicitly marked public; protected by the supplied Gateway authorizer |
+| `publicResponseHandler` | `ANY /api/dispatch/public` | Only explicitly marked public methods; no authorizer |
 
 A method must be an own function on the registered request prototype.
 `constructor`, inherited Object methods, and response-only methods are refused.
 The fixed handler decides the category; URL query parameters and payload flags
-cannot change it. `$WebSocket.$authorize` is an internal protected operation,
-independent of the suffix. Public dispatch cannot invoke it.
+cannot change it. `$WebSocket.$authorize` is an internal protected operation.
+Public dispatch cannot invoke it. Mark a shared request-class method with
+`@Public()` to expose it anonymously; all other methods are protected by default.
+Plain JavaScript applications may instead pass the matching `publicMethods` list
+to `registerResponse()` and the client authentication options. Do not mix the
+two declaration styles for a response class.
 
 API Gateway validates tokens. For JWT authorizers, the framework reads only
 `requestContext.authorizer.jwt.claims` and `.scopes`; it never decodes a client
@@ -82,7 +85,6 @@ See [AWS JWT authorizer behavior](https://docs.aws.amazon.com/apigateway/latest/
 
 ```ts
 const client = new ClassifyClient(getSession, setSession, '/api/dispatch', {
-    publicSuffix: 'Public',
     getAccessToken: async () => applicationTokenManager.currentAccessToken(),
     // publicURL: '/api/dispatch/public', // derived from postURL by default
 });
@@ -125,7 +127,6 @@ For another compatible Gateway authorizer, define it under
 
 ```ts
 classifyServerless.configureAuthentication({
-    publicSuffix: 'Public',
     identityAdapter: authorizer => {
         const trusted = (authorizer as {lambda?: {subject: string, issuer: string, scopes: string[]}})?.lambda;
         return trusted && {
@@ -147,6 +148,15 @@ from an IAM-authorized invoker is outside the browser/Gateway trust boundary.
 Framework refusal and member exceptions retain the serialized error contract.
 Gateway authentication failures remain HTTP 401/403 before dispatch. Framework
 HTTP responses carry `Cache-Control: no-store`.
+
+The supplied `provider-iam.yml` grants DynamoDB access only to the framework
+session table and its indexes. Add separate, least-privilege IAM statements in
+your application's `serverless.yml` for every application table and action it
+uses; do not restore a wildcard DynamoDB resource.
+
+Public methods are internet-facing application operations. Configure suitable
+API Gateway throttling and application-specific abuse controls for their cost
+and availability profile.
 
 For default CloudFront hosting, use `resources-website-authenticated.yml` instead
 of `resources-website.yml`. Its API behavior uses AWS's managed CachingDisabled

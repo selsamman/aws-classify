@@ -1,5 +1,6 @@
 /** @jest-environment node */
 import {ClassifyServerless} from 'aws-classify-server';
+import {Public} from 'aws-classify-common';
 import {attachAuthenticatedSocket, detachAuthenticatedSocket} from '../../aws-classify-server/lib/cjs/AuthenticatedSessions';
 import {serialize, deserialize, serializable} from 'js-freeze-dry';
 jest.mock('@aws-sdk/lib-dynamodb', () => {
@@ -10,6 +11,7 @@ const db = jest.requireMock('@aws-sdk/lib-dynamodb').database;
 class AuthUnitRequest {
     static interfaceName = 'AuthUnit';
     async run(): Promise<any> {}
+    @Public()
     async runPublic(): Promise<any> {}
     async delayed(_wait: Promise<void>): Promise<any> {}
 }
@@ -32,7 +34,7 @@ beforeEach(() => {
     jest.clearAllMocks(); invoked = 0;
     delete process.env.IS_OFFLINE;
     db.get.mockResolvedValue({}); db.put.mockResolvedValue({}); db.update.mockResolvedValue({}); db.transactWrite.mockResolvedValue({});
-    server = new ClassifyServerless(); server.configureAuthentication({publicSuffix:'Public'}); server.registerResponse(AuthUnitResponse);
+    server = new ClassifyServerless(); server.configureAuthentication({}); server.registerResponse(AuthUnitResponse);
 });
 afterEach(() => {delete process.env.IS_OFFLINE; jest.useRealTimers();});
 it('uses immutable Gateway identity in methods and callbacks without persisting context', async () => {
@@ -91,12 +93,9 @@ it.each([
     expect(invoked).toBe(0); expect(db.update).not.toHaveBeenCalled(); expect(db.put).not.toHaveBeenCalled();
 });
 it('adapts Lambda-authorizer context only through application configuration', async () => {
-    server.configureAuthentication({publicSuffix:'Public',identityAdapter:(auth:any) => auth?.lambda ? {subject:auth.lambda.principal,issuer:'app-authorizer',scopes:['custom'],claims:{}} : undefined});
+    server.configureAuthentication({identityAdapter:(auth:any) => auth?.lambda ? {subject:auth.lambda.principal,issuer:'app-authorizer',scopes:['custom'],claims:{}} : undefined});
     const ev=event(); ev.requestContext.authorizer={lambda:{principal:'trusted'}};
     expect(deserialize(await server.dispatch(ev,context)).data.identity.subject).toBe('trusted');
-});
-it.each(['',' ','$authorize','*','Public.'])('rejects invalid suffix %s', suffix => {
-    expect(() => server.configureAuthentication({publicSuffix:suffix})).toThrow('publicSuffix');
 });
 it('stores only a credential hash and binds consumption and connection recording atomically', async () => {
     const ev=event(); ev.body=serialize({interfaceName:'$WebSocket',methodName:'$authorize',args:[],sessionId:''});

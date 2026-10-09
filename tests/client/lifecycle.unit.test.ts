@@ -5,11 +5,12 @@ import {AddressInfo} from 'node:net';
 import {exportJWK, generateKeyPair, SignJWT} from 'jose';
 import {InMemoryWebStorage} from 'oidc-client-ts';
 import {ClassifyClient, AuthorizationRequest} from 'aws-classify-client';
+import {Public} from 'aws-classify-common';
 import {serialize} from 'js-freeze-dry';
 import axios from 'axios';
 jest.mock('axios');
 const post = axios.post as jest.Mock;
-class Request {static interfaceName = 'Lifecycle'; async inspect(): Promise<any> {} async inspectPublic(): Promise<any> {}}
+class Request {static interfaceName = 'Lifecycle'; async inspect(): Promise<any> {} @Public() async inspectPublic(): Promise<any> {}}
 const deferred = () => {let resolve!: (value?: any) => void; const promise = new Promise<any>(r => {resolve=r;}); return {promise, resolve};};
 let server: Server, issuer: string, privateKey: any, jwk: any;
 let code = 0, subject: string, nonce: string, challenge: string, tokenCalls: number, refreshCalls: number;
@@ -27,7 +28,7 @@ function cacheKey(suffix: string): string {
 }
 function expire() {const key=cacheKey('credentials'); const value=JSON.parse(storage.getItem(key)!); value.expiresAt=0; storage.setItem(key,JSON.stringify(value));}
 function client(set = async (id: string) => {session=id; saved.push(id);}) {
-    const client = new ClassifyClient(async () => session, set, issuer+'/api/dispatch', {publicSuffix:'Public', managed:{issuer, clientId:'browser', redirectUri:issuer+'/return', scopes:['openid','api/invoke']}});
+    const client = new ClassifyClient(async () => session, set, issuer+'/api/dispatch', {managed:{issuer, clientId:'browser', redirectUri:issuer+'/return', scopes:['openid','api/invoke']}});
     client.setLogger(() => {}); return client;
 }
 async function start(): Promise<{request: AuthorizationRequest; callback: string}> {
@@ -148,8 +149,8 @@ it('surfaces cleanup failure while protected requests remain disabled; repeated 
     c.setSession=async id => {session=id;}; await c.logout(); expect(session).toBe('');
 });
 it('rejects ambiguous credential ownership and invalid managed configuration',() => {
-    expect(() => new ClassifyClient(async()=>'',async()=>{},undefined,{publicSuffix:'Public',getAccessToken:()=>'',managed:{}} as any)).toThrow('exactly one');
-    expect(() => new ClassifyClient(async()=>'',async()=>{},undefined,{publicSuffix:'Public',managed:{issuer,clientId:'browser',redirectUri:issuer+'/return',scopes:['api']}})).toThrow('openid');
+    expect(() => new ClassifyClient(async()=>'',async()=>{},undefined,{getAccessToken:()=>'',managed:{}} as any)).toThrow('exactly one');
+    expect(() => new ClassifyClient(async()=>'',async()=>{},undefined,{managed:{issuer,clientId:'browser',redirectUri:issuer+'/return',scopes:['api']}})).toThrow('openid');
 });
 it('logout cancels socket authorization and ignores stale open/message/close events',async () => {
     await login(); const native=global.WebSocket;
@@ -174,7 +175,7 @@ it('logout cancels socket authorization and ignores stale open/message/close eve
     } finally {global.WebSocket=native;}
 });
 it('logout while reading an external token prevents protected transport and allows public calls',async () => {
-    const token=deferred(); c=new ClassifyClient(async()=>'',async()=>{},issuer+'/api/dispatch',{publicSuffix:'Public',getAccessToken:()=>token.promise});c.setLogger(()=>{});
+    const token=deferred(); c=new ClassifyClient(async()=>'',async()=>{},issuer+'/api/dispatch',{getAccessToken:()=>token.promise});c.setLogger(()=>{});
     const request=c.createRequest(Request), pending=request.inspect(); for(let i=0;i<20;i++) await Promise.resolve(); await c.logout();token.resolve('late');
     await expect(pending).rejects.toThrow('Authentication changed');expect(post).not.toHaveBeenCalled();await request.inspectPublic();
 });

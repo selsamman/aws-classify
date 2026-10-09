@@ -1,6 +1,7 @@
 import axios from 'axios';
 import {serialize} from 'js-freeze-dry';
 import {ClassifyClient} from 'aws-classify-client';
+import {Public} from 'aws-classify-common';
 import {ServerRequest} from '@aws-classify-tests/requests';
 jest.mock('axios');
 const post = axios.post as jest.Mock;
@@ -65,9 +66,9 @@ it('allows retry after the socket connection fails to open', async () => {
 });
 
 it('reads the current access token for each protected request and keeps public sessions separate', async () => {
-    class Request {static interfaceName='AuthRequest'; async inspect() {} async inspectPublic() {}}
+    class Request {static interfaceName='AuthRequest'; async inspect() {} @Public() async inspectPublic() {}}
     let session='owned'; let token='first'; const read=jest.fn(async () => token);
-    const c=new ClassifyClient(async () => session,async value => {session=value;},'http://fixture/api/dispatch',{publicSuffix:'Public',getAccessToken:read}); c.setLogger(() => {});
+    const c=new ClassifyClient(async () => session,async value => {session=value;},'http://fixture/api/dispatch',{getAccessToken:read}); c.setLogger(() => {});
     const request=c.createRequest(Request);
     post.mockResolvedValue({data:serialize({data:1,sessionId:'owned'})}); await request.inspect();
     expect(post.mock.calls[0][2].headers.Authorization).toBe('Bearer first');
@@ -78,7 +79,7 @@ it('reads the current access token for each protected request and keeps public s
     await request.inspectPublic(); expect(post.mock.calls[3][1]).toContain('anonymous');
 });
 it('fails protected requests when the application cannot supply an access token', async () => {
-    const c=new ClassifyClient(async () => '',async () => {},undefined,{publicSuffix:'Public',getAccessToken:() => undefined}); c.setLogger(() => {});
+    const c=new ClassifyClient(async () => '',async () => {},undefined,{getAccessToken:() => undefined}); c.setLogger(() => {});
     await expect(c.createRequest(ServerRequest).getCount()).rejects.toThrow('Access token required'); expect(post).not.toHaveBeenCalled();
 });
 

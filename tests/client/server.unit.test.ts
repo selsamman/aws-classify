@@ -70,6 +70,6 @@ it('keeps legacy session enumeration intact while authentication hides reverse c
     db.scan.mockResolvedValue({Items:[{sessionId:'connection#legacy-app-id'},{sessionId:'ordinary'}]});
     const framework=new ClassifyServerless();
     expect(await framework.getSessions()).toEqual(['connection#legacy-app-id','ordinary']);
-    framework.configureAuthentication({publicSuffix:'Public'});
+    framework.configureAuthentication({});
     expect(await framework.getSessions()).toEqual(['ordinary']);
 });

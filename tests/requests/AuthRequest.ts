@@ -1,7 +1,8 @@
-import {reqBody} from 'aws-classify-common';
+import {Public, reqBody} from 'aws-classify-common';
 export class AuthRequest {
     static interfaceName = 'AuthRequest';
     async inspect(): Promise<any> { return reqBody(); }
+    @Public()
     async inspectPublic(): Promise<any> { return reqBody(); }
     async setValue(_value: number): Promise<void> { return reqBody(); }
     async getValue(): Promise<number> { return reqBody(); }

@@ -25,7 +25,6 @@ custom:
     authorizer:
       name: applicationJwt
       scopes: [example/invoke]
-    publicSuffix: Public
   directories:
     responseHandlers: src/responses/index
     includeFiles: ../node_modules/aws-classify-server/yml
@@ -86,10 +85,11 @@ your API; `example/invoke` is a placeholder. Multiple Gateway route scopes are
 tokens; do not use an ID token to call your API.
 
 Export `publicResponseHandler` in addition to the other three framework handlers
-from `cloud/src/responses/index.ts`. Protected dispatch accepts exposed methods
-without `Public`; public dispatch accepts exposed methods ending in `Public`.
-Use the same configurable suffix on the client and server. A payload flag cannot
-change which entry point is allowed to invoke a method.
+from `cloud/src/responses/index.ts`. In authenticated mode every exposed method
+is protected unless its shared request-class method has `@Public()`. Public
+dispatch accepts only those marked methods; a payload flag cannot change which
+entry point invokes a method. Plain JavaScript applications can use the matching
+`publicMethods` lists at server registration and client construction instead.
 
 The authenticated CloudFront template forwards Authorization, disables API
 caching and preserves authentication errors. The legacy static-hosting template
@@ -124,7 +124,6 @@ export const authClient = new ClassifyClient(
     async id => { sessionStorage.setItem('my-app-protected-session', id); },
     '/api/dispatch',
     {
-        publicSuffix: 'Public',
         managed: {
             issuer: 'https://YOUR-OIDC-ISSUER',
             clientId: 'YOUR-PUBLIC-CLIENT-ID',
@@ -216,7 +215,6 @@ Supply `getAccessToken` instead of `managed`:
 
 ```ts
 const client = new ClassifyClient(getSession, setSession, '/api/dispatch', {
-    publicSuffix: 'Public',
     getAccessToken: async () => applicationTokenManager.currentAccessToken(),
 });
 ```

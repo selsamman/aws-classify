@@ -32,8 +32,9 @@ export interface ManagedAuthenticationOptions {
     };
 }
 interface ClientAuthenticationRouting {
-    publicSuffix: string;
     publicURL?: string;
+    /** Plain-JavaScript fallback for methods marked public at server registration. */
+    publicMethods?: readonly string[];
     /** Optional persistence for a separate anonymous session. Defaults to client-local memory. */
     getPublicSession?: () => Promise<string>;
     setPublicSession?: (sessionId: string) => Promise<void>;
@@ -54,11 +55,6 @@ export interface AuthorizationRequest {
 export interface LocalLogoutResult {
     /** Only for constructing a provider logout URL. Treat as a credential. */
     readonly idTokenHint?: string;
-}
-export function validatePublicSuffix(suffix: string): string {
-    if (typeof suffix !== 'string' || !/^[A-Za-z][A-Za-z0-9_]*$/.test(suffix))
-        throw new Error('publicSuffix must be a nonempty identifier suffix beginning with a letter');
-    return suffix;
 }
 export interface SocketAuthorization {
     url: string;

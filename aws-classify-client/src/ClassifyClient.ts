@@ -1,6 +1,6 @@
 import type {LambdaRequest, LambdaResponse, EndPointsLogging, ClientAuthenticationOptions, ManagedClientAuthenticationOptions, SocketAuthorization, AuthorizationRequest, LocalLogoutResult} from "aws-classify-common";
 import {deserialize, serialize} from "js-freeze-dry";
-import {validatePublicSuffix} from "aws-classify-common";
+import {isPublicEndpoint} from "aws-classify-common";
 import axios from "axios";
 import {ManagedAuthentication, AuthenticationChangedError, LoginRequiredError} from "./ManagedAuthentication";
 
@@ -11,9 +11,9 @@ export class ClassifyClient {
         getSession : () => Promise<string>, setSession : (sessionId: string) => Promise<void>, postURL = '/api/dispatch', authentication?: ClientAuthenticationOptions | ManagedClientAuthenticationOptions) {
         this.postURL = postURL;
         if (authentication) {
-            validatePublicSuffix(authentication.publicSuffix);
             if (!!authentication.managed === (typeof authentication.getAccessToken === 'function')) throw new Error('Supply exactly one of managed or getAccessToken');
             if (!!authentication.getPublicSession !== !!authentication.setPublicSession) throw new Error('Supply both public session callbacks');
+            if (authentication.publicMethods !== undefined && (!Array.isArray(authentication.publicMethods) || !authentication.publicMethods.every(method => typeof method === 'string' && method))) throw new Error('publicMethods must be an array of method names');
             this.authentication = {...authentication};
         }
         this.getSession = getSession;
@@ -92,7 +92,9 @@ export class ClassifyClient {
         return Object.freeze({idTokenHint});
     }
     private publicSession = '';
-    private isPublic(method: string) { return !!this.authentication && method.endsWith(this.authentication.publicSuffix); }
+    private isPublic(requestClass: new () => unknown, method: string) {
+        return !!this.authentication && (isPublicEndpoint(requestClass.prototype[method]) || !!this.authentication.publicMethods?.includes(method));
+    }
     private async requestHeaders(isPublic = false, generation = this.generation) {
         const headers: Record<string, string> = {'Content-Type': 'text/plain'};
         if (this.authentication && !isPublic) {
@@ -265,7 +267,7 @@ export class ClassifyClient {
             (requestObj as any)[methodName] = async (...args: any) => {
 
                 const generation = this.generation;
-                const isPublic = this.isPublic(methodName);
+                const isPublic = this.isPublic(requestClass, methodName);
                 try {
                     const request: LambdaRequest = {
                         interfaceName: interfaceName,

@@ -23,7 +23,7 @@ export const backgroundNotify = async (event: {sessionId: string, value: number}
     return {identity: classifyServerless.getRequestContext()?.identity || null};
 };
 
-if (process.env.AWS_CLASSIFY_AUTHENTICATION === 'true') classifyServerless.configureAuthentication({publicSuffix: 'Public', connectionCredentialSeconds: 10});
+if (process.env.AWS_CLASSIFY_AUTHENTICATION === 'true') classifyServerless.configureAuthentication({connectionCredentialSeconds: 10});
 
 // Fixture-only route: browser preflight must not require a bearer token.
 // Gateway supplies the configured CORS headers; this exposes no dispatch.

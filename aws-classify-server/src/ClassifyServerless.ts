@@ -3,7 +3,7 @@ import {ClassDef} from "./ClassDef";
 import type {LambdaRequest, LambdaResponse, RequestContext} from "aws-classify-common";
 import {sessionStore as ddbDocClient} from "./SessionStore";
 import {AsyncLocalStorage} from "node:async_hooks";
-import {validatePublicSuffix} from "aws-classify-common";
+import {isPublicEndpoint} from "aws-classify-common";
 import {HttpEvent, ServerAuthenticationOptions, requestContext} from "./Authentication";
 import {ownedSession, sessionOwner, issueConnectionCredential} from "./AuthenticatedSessions";
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from "@aws-sdk/client-apigatewaymanagementapi";
@@ -22,10 +22,9 @@ export class ClassifyServerless {
 
     constructor() {
         if (process.env.AWS_CLASSIFY_AUTHENTICATION === 'true')
-            this.configureAuthentication({publicSuffix: process.env.AWS_CLASSIFY_PUBLIC_SUFFIX || ''});
+            this.configureAuthentication({});
     }
     configureAuthentication(options: ServerAuthenticationOptions) {
-        validatePublicSuffix(options.publicSuffix);
         const seconds = options.connectionCredentialSeconds ?? 60;
         if (!Number.isInteger(seconds) || seconds < 1 || seconds > 300) throw new Error('connectionCredentialSeconds must be 1–300');
         this.authentication = Object.freeze({...options, connectionCredentialSeconds: seconds});
@@ -57,7 +56,8 @@ export class ClassifyServerless {
     }
 
     registerResponse<T>(responseClass : new () => T,
-                            authorizer? : (_endPoint: T, _method: string, _args: IArguments, _context?: RequestContext) => Promise<boolean>) {
+                            authorizer? : (_endPoint: T, _method: string, _args: IArguments, _context?: RequestContext) => Promise<boolean>,
+                            options?: {publicMethods?: readonly string[]}) {
 
         // Find ultimate base class
         let clientClass = responseClass;
@@ -71,7 +71,14 @@ export class ClassifyServerless {
         if (!interfaceName)
             throw ('ClassifyServerless.registerResponse: Request must have interfaceName as a static property')
 
-        this.classDefs.set(interfaceName, {serverClass: responseClass, clientClass, authorizer});
+        const methods = Object.getOwnPropertyNames(clientClass.prototype).filter(method => method !== 'constructor' && typeof clientClass.prototype[method] === 'function');
+        const decorated = methods.filter(method => isPublicEndpoint(clientClass.prototype[method]));
+        if (options?.publicMethods !== undefined && decorated.length) throw new Error('Use either @Public() or publicMethods, not both');
+        const publicMethods = options?.publicMethods === undefined ? decorated : [...options.publicMethods];
+        if (!publicMethods.every(method => typeof method === 'string' && methods.includes(method)) || new Set(publicMethods).size !== publicMethods.length)
+            throw new Error('publicMethods must be unique request-class method names');
+
+        this.classDefs.set(interfaceName, {serverClass: responseClass, clientClass, authorizer, publicMethods: new Set(publicMethods)});
         (responseClass as any).__interfaceName__ = interfaceName;
     }
 
@@ -124,7 +131,7 @@ export class ClassifyServerless {
         if (request.methodName === 'constructor' || !Object.prototype.hasOwnProperty.call(classDef.clientClass.prototype, request.methodName) || typeof classDef.clientClass.prototype[request.methodName] !== 'function')
             throw new Error(`${request.methodName} not found in ${request.interfaceName} client request class`);
 
-        if (this.authentication && request.methodName.endsWith(this.authentication.publicSuffix) !== (trusted.dispatch === 'public')) throw new Error('Member is not permitted on this dispatch endpoint');
+        if (this.authentication && classDef.publicMethods.has(request.methodName) !== (trusted.dispatch === 'public')) throw new Error('Member is not permitted on this dispatch endpoint');
 
         // If authorizer passed in make sure request is authorized
         if (!classDef.authorizer || await (this.authentication ? classDef.authorizer(request.interfaceName, request.methodName, request.args as any, trusted) : classDef.authorizer(request.interfaceName, request.methodName, request.args as any))) {

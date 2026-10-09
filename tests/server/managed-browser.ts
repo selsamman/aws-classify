@@ -10,7 +10,7 @@ if (endpoint) sessionStorage.setItem('fixture-endpoint', endpoint);
 class Request {static interfaceName='AuthRequest'; async inspect(): Promise<any> {} async inspectPublic(): Promise<any> {}}
 const client = new ClassifyClient(async () => sessionStorage.getItem('fixture-protected') || '', async id => {sessionStorage.setItem('fixture-protected',id);},
     sessionStorage.getItem('fixture-endpoint') === 'direct' ? config.api : config.website+'/api/dispatch',
-    {publicSuffix:'Public', managed:{issuer:config.issuer,clientId:config.clientId,redirectUri:callback,scopes:['openid','fixture/invoke'],refreshLeewaySeconds:300}});
+    {managed:{issuer:config.issuer,clientId:config.clientId,redirectUri:callback,scopes:['openid','fixture/invoke'],refreshLeewaySeconds:300}});
 client.setLogger(() => {});
 const request = client.createRequest(Request);
 const bridge = {

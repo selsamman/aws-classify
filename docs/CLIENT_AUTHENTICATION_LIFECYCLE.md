@@ -46,7 +46,6 @@ const client = new ClassifyClient(
     async id => { sessionStorage.setItem('application-protected-session', id); },
     '/api/dispatch',
     {
-        publicSuffix: 'Public',
         managed: {
             issuer: 'https://issuer.example',
             clientId: 'registered-public-client',
