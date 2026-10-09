@@ -1,0 +1,34 @@
+:root {
+  --ifm-color-primary: #087e8b;
+  --ifm-color-primary-dark: #07717d;
+  --ifm-color-primary-darker: #076b76;
+  --ifm-color-primary-darkest: #065861;
+  --ifm-color-primary-light: #098b99;
+  --ifm-color-primary-lighter: #0991a0;
+  --ifm-color-primary-lightest: #0aa4b5;
+  --ifm-font-family-base: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --ifm-heading-font-weight: 650;
+  --ifm-line-height-base: 1.7;
+  --ifm-code-font-size: 90%;
+  --ifm-navbar-shadow: 0 1px 0 rgba(15, 40, 55, .08);
+  --ifm-footer-background-color: #122c3a;
+}
+[data-theme='dark'] {
+  --ifm-color-primary: #5ad3cf;
+  --ifm-color-primary-dark: #3dcbc6;
+  --ifm-color-primary-darker: #30c5c0;
+  --ifm-color-primary-darkest: #279f9b;
+  --ifm-color-primary-light: #77dbd8;
+  --ifm-color-primary-lighter: #86dfdd;
+  --ifm-color-primary-lightest: #b2ebe9;
+}
+.markdown h1 {font-size: clamp(2rem, 4vw, 2.8rem); letter-spacing: -.035em;}
+.markdown h2 {letter-spacing: -.02em; margin-top: 2.3rem;}
+.markdown > p {max-width: 76ch;}
+.guide-lead {font-size: 1.2rem; color: var(--ifm-color-emphasis-700);}
+.guide-paths {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1.8rem 0;}
+.guide-path {border: 1px solid var(--ifm-color-emphasis-200); border-radius: 12px; padding: 1.3rem; background: var(--ifm-background-surface-color);}
+.guide-path h2 {font-size: 1.35rem; margin: 0 0 .6rem;}
+.guide-path p {margin-bottom: .8rem;}
+.guide-path a {font-weight: 600;}
+@media (max-width: 600px) {.guide-paths {grid-template-columns: 1fr;}}

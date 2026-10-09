@@ -1,4 +1,4 @@
-name: Publish to npm
+name: Publish all aws-classify packages
 
 on:
   release:
@@ -8,13 +8,23 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v6
@@ -23,14 +33,53 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install npm with OIDC publish and dist-tag support
+        run: npm install --global npm@11.21.0
 
-      - name: Build
-        run: npm run build --if-present
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Check synchronized versions, dependencies and release tag
+        run: npm run release:check
+
+      - name: Prepare test tooling
+        run: npm rebuild serverless
+
+      - name: Check Serverless CI authentication
+        env:
+          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
+        run: |
+          if [ -z "$SERVERLESS_ACCESS_KEY" ]; then
+            echo 'Configure the SERVERLESS_ACCESS_KEY repository secret for the offline suite.'
+            exit 1
+          fi
+
+      - name: Build and typecheck
+        run: npm run typecheck
 
       - name: Test
+        env:
+          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
         run: npm test
 
-      - name: Publish
-        run: npm publish
+      - name: Test release and recovery behavior
+        run: npm run test:release
+
+      - name: Check packed consumers
+        run: npm run test:packed
+
+      - name: Audit framework dependencies
+        run: npm run audit
+
+      - name: Publish common, client and server as one release
+        run: npm run release:publish
+
+      - name: Preserve release tarballs and manifest
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: npm-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .test-results/release/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14

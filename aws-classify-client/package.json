@@ -1,6 +1,6 @@
 {
   "name": "aws-classify-client",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
   "types": "./lib/esm/index.d.ts",
@@ -25,7 +25,7 @@
     "typescript": "^4.9.5"
   },
   "dependencies": {
-    "aws-classify-common": "0.1.0",
+    "aws-classify-common": "0.2.0",
     "axios": "^1.20.0",
     "jose": "^5.10.0",
     "js-freeze-dry": "^1.1.4",

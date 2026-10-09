@@ -1,6 +1,6 @@
 {
   "name": "aws-classify-server",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
   "types": "./lib/esm/index.d.ts",
@@ -30,7 +30,7 @@
     "@aws-sdk/client-apigatewaymanagementapi": "^3.1146.0",
     "@aws-sdk/client-dynamodb": "^3.1146.0",
     "@aws-sdk/lib-dynamodb": "^3.1146.0",
-    "aws-classify-common": "0.1.0",
+    "aws-classify-common": "0.2.0",
     "js-freeze-dry": "^1.1.4"
   },
   "engines": {

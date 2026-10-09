@@ -26,6 +26,9 @@ requests. The harness supplies dummy AWS credentials to its subprocesses.
 
 `npm test` runs the harness regression tests and the browser client integration
 suite. The client suite uses Jest 30.
+The release automation has separate offline failure/recovery checks:
+`npm run test:release`. Package release commands and CI prerequisites are described
+in the [release record](../docs/RELEASING.md).
 To run the harness or integration tests separately:
 
 ```sh

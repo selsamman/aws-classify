@@ -1,0 +1,66 @@
+---
+title: Welcome to aws-classify
+slug: /
+description: Build client and AWS applications with shared TypeScript request classes.
+---
+
+import Link from '@docusaurus/Link';
+
+# Your client and server, speaking TypeScript
+
+<p className="guide-lead">Call a method in your browser or mobile app. Run its implementation in an AWS Lambda. Send a notification back when there is something new to show.</p>
+
+aws-classify connects clients and AWS through shared request classes. You define
+the methods both sides understand, then implement each method where it belongs.
+The framework handles dispatch, serialization, application session state and
+WebSocket notifications. Your application supplies its UI and business rules.
+
+<div className="guide-paths">
+  <div className="guide-path">
+    <h2>Starting something new?</h2>
+    <p>Set up shared requests, make your first call, and deploy when you are ready.</p>
+    <Link to="/getting-started/project-layout">Start the tutorial →</Link>
+  </div>
+  <div className="guide-path">
+    <h2>Already have a project?</h2>
+    <p>Add the pieces you need to your existing frontend and Serverless backend.</p>
+    <Link to="/existing-projects">Follow the integration path →</Link>
+  </div>
+</div>
+
+## What you will build
+
+The tutorial uses a tiny counter to explain client-to-server calls and saved
+state. Then we add a notification from the server to the browser. These are
+focused examples you can put into your own project; this repository does not
+contain another complete sample application.
+
+For a runnable web, mobile and AWS application, follow the
+[simple chat example](examples.md). Its layout is the convention used throughout
+this guide:
+
+```text
+my-app/
+  cloud/              # Lambda implementations and deployment
+  web/                # browser application
+  mobile/             # optional mobile application
+  common/requests/    # request classes shared by all three
+```
+
+Use the parts that fit your project. Mobile, static website hosting, custom
+domains and OIDC login are optional. A project generator is not required;
+the guide explains manual setup and integration into an existing application.
+
+## The three libraries
+
+| Package | What it does |
+| --- | --- |
+| `aws-classify-common` | Shared request/response types, authentication types and the `reqBody()` placeholder |
+| `aws-classify-client` | Creates client request proxies, receives notifications and optionally manages browser OIDC authentication |
+| `aws-classify-server` | Registers implementations, dispatches calls, persists session state and sends notifications through API Gateway |
+
+Your application's `common/requests` is its own private workspace package. It is
+different from the published `aws-classify-common` framework package.
+
+When you need a method signature, head to the [reference](reference/client.md).
+If you are changing aws-classify itself, start with [repository setup](repository/setup.md).

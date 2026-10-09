@@ -13,7 +13,8 @@
     "tests/client"
   ],
   "devDependencies": {
-    "@istanbuljs/load-nyc-config": "^1.1.0"
+    "@istanbuljs/load-nyc-config": "^1.1.0",
+    "semver": "^7.8.5"
   },
   "scripts": {
     "install:tests": "npm ci --ignore-scripts && npm rebuild serverless && npm run build",
@@ -24,6 +25,10 @@
     "test:aws": "npm run build && npm run test:aws --workspace @aws-classify-tests/server --",
     "test:packed": "npm run build && node tests/packed-consumer.js",
     "test:aws:auth": "npm run test:aws -- --auth",
+    "release:version": "node scripts/release-version.cjs",
+    "release:check": "node scripts/release-check.cjs",
+    "release:publish": "node scripts/release-publish.cjs",
+    "test:release": "node --test tests/release.test.cjs",
     "guide:install": "npm --prefix usersguide ci --workspaces=false",
     "guide:dev": "npm --prefix usersguide start",
     "guide:build": "npm --prefix usersguide run build",
