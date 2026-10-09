@@ -35,10 +35,12 @@ function edit(root, filename, change) {
     fs.writeFileSync(target, JSON.stringify(data));
 }
 function fakeRegistry(root, version = '0.2.0') {
+    let elapsed = 0;
     const state = {versions: new Map(), tags: new Map(packages.map(name => [name, {latest: '0.1.0'}])),
         calls: [], failPublish: undefined, failPromotion: undefined, omitEntry: false};
     const records = new Map();
-    const options = {root, tag: `v${version}`, prerelease: version.includes('-'), log: () => {}, wait: async () => {},
+    const options = {root, tag: `v${version}`, prerelease: version.includes('-'), log: () => {},
+        now: () => elapsed, wait: async ms => {elapsed += ms;},
         getVersion: async name => state.versions.get(name) || null,
         getTags: async name => ({...state.tags.get(name)}),
         runNpm(args) {
@@ -200,6 +202,68 @@ test('registry visibility lag is retried before promotion', async t => {
         return getVersion(name);
     };
     await publishRelease(options); assert.equal(lag, 3);
+});
+
+test('minutes of npm processing delay do not cause early failure or tag promotion', async t => {
+    const {state, options} = fakeRegistry(fixture(t));
+    const getVersion = options.getVersion;
+    const waits = [];
+    const wait = options.wait;
+    options.wait = async ms => {
+        assert.equal(state.calls.filter(call => call[0] === 'promote').length, 0);
+        waits.push(ms);
+        await wait(ms);
+    };
+    options.getVersion = async name => {
+        const readyAt = name === packages[0] ? 180000 : name === packages[1] ? 240000 : 300000;
+        if (options.now() < readyAt) return null;
+        return getVersion(name);
+    };
+    await publishRelease(options);
+    assert.ok(options.now() >= 300000);
+    assert.ok(waits.every(ms => ms <= 30000));
+    for (const tags of state.tags.values()) assert.equal(tags.latest, '0.2.0');
+});
+
+test('unavailable uploads time out after one shared ten-minute budget without tag changes and can resume', async t => {
+    const {state, options} = fakeRegistry(fixture(t));
+    const getVersion = options.getVersion;
+    options.getVersion = async () => null;
+    await assert.rejects(publishRelease(options), /after ten minutes.*no tags were promoted/);
+    assert.equal(options.now(), 600000);
+    assert.equal(state.calls.filter(call => call[0] === 'publish').length, 3);
+    assert.equal(state.calls.filter(call => call[0] === 'promote').length, 0);
+    for (const tags of state.tags.values()) assert.equal(tags.latest, '0.1.0');
+    options.getVersion = getVersion;
+    await publishRelease(options);
+    assert.equal(state.calls.filter(call => call[0] === 'publish').length, 3);
+    for (const tags of state.tags.values()) assert.equal(tags.latest, '0.2.0');
+});
+
+test('conflicting content becoming visible during processing fails before promotion', async t => {
+    const {state, options} = fakeRegistry(fixture(t));
+    const getVersion = options.getVersion;
+    options.getVersion = async name => {
+        if (name === packages[0] && state.versions.has(name)) {
+            if (options.now() < 180000) return null;
+            return {...await getVersion(name), dist: {integrity: 'unexpected'}};
+        }
+        return getVersion(name);
+    };
+    await assert.rejects(publishRelease(options), /different content/);
+    assert.ok(options.now() >= 180000);
+    assert.equal(state.calls.filter(call => call[0] === 'promote').length, 0);
+});
+
+test('registry errors during the visibility wait stop promotion', async t => {
+    const {state, options} = fakeRegistry(fixture(t));
+    const getVersion = options.getVersion;
+    options.getVersion = async name => {
+        if (state.versions.size) throw new Error('registry unavailable after upload');
+        return getVersion(name);
+    };
+    await assert.rejects(publishRelease(options), /unavailable after upload/);
+    assert.equal(state.calls.filter(call => call[0] === 'promote').length, 0);
 });
 
 test('real publication is refused from a local invocation', () => {

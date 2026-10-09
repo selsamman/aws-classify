@@ -93,6 +93,14 @@ workflow for the same release**. Already uploaded packages are skipped only when
 their integrity matches the newly built tarballs. Different contents at an
 existing version require a new version; npm versions are immutable.
 
+npm may take several minutes to process successful uploads. The publisher waits
+up to ten minutes for all three versions to become visible before updating tags.
+If it times out, wait for npm processing to finish, then open the failed run in
+GitHub Actions and choose **Re-run failed jobs**. Ensure **Allow npm dist-tag** is
+enabled for each package's trusted publisher; permission to publish alone does
+not allow updating `latest`. You do not need a new release or package version
+when the uploaded contents already match.
+
 An upload failure leaves `latest` unchanged. npm performs uploads and tag changes
 as individual operations, so this is not an atomic transaction. A failure during
 the final tag updates can briefly leave the three `latest` tags mixed; the same

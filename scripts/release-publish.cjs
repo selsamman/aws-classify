@@ -33,6 +33,7 @@ function assertMatching(record, published) {
 
 async function publishRelease({root, tag, prerelease, dryRun = false, runNpm,
     getVersion = readVersion, getTags = readTags, log = console.log,
+    now = Date.now,
     wait = ms => new Promise(resolve => setTimeout(resolve, ms))}) {
     const release = checkRelease(root, tag, prerelease);
     runNpm ||= (args, capture) => npm(args, capture, root);
@@ -84,16 +85,28 @@ async function publishRelease({root, tag, prerelease, dryRun = false, runNpm,
         return records;
     }
 
-    // Registry visibility can lag a successful publish. Never promote until all match.
-    for (const record of records) {
-        let visible;
-        for (let attempt = 0; attempt < 6; attempt++) {
-            visible = await getVersion(record.name, record.version);
+    // npm can process successful uploads for several minutes. Share one ten-minute
+    // deadline across packages, and never promote until every integrity matches.
+    const pending = new Map(records.map(record => [record.name, record]));
+    const deadline = now() + 10 * 60 * 1000;
+    let interval = 10000;
+    while (pending.size) {
+        const checks = await Promise.all([...pending.values()].map(async record => {
+            const visible = await getVersion(record.name, record.version);
             assertMatching(record, visible);
-            if (visible) break;
-            if (attempt < 5) await wait(2000);
+            return {record, visible};
+        }));
+        for (const {record, visible} of checks) {
+            if (visible) pending.delete(record.name);
         }
-        if (!visible) throw new Error(`${record.name}@${record.version} is not visible yet. Rerun this release; no tags were promoted.`);
+        if (!pending.size) break;
+        const remaining = deadline - now();
+        if (remaining <= 0) {
+            throw new Error(`${[...pending.keys()].join(', ')}@${release.version} not visible after ten minutes. Rerun the same release; no tags were promoted.`);
+        }
+        log(`Waiting for npm to process ${[...pending.keys()].join(', ')}@${release.version}; no tags promoted yet.`);
+        await wait(Math.min(interval, remaining));
+        interval = Math.min(interval * 2, 30000);
     }
     // Recheck rollback protection at the promotion boundary as well.
     const latestTags = await Promise.all(records.map(record => getTags(record.name)));

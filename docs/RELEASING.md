@@ -69,6 +69,10 @@ the **tag** must be `v<package-version>`.
 - Uploads occur in dependency order: **common, client, server**, under the
   version-specific `release-<version>` tag. Stable/prerelease promotion starts
   only after all three registry versions match the packed content.
+- Successful uploads may take several minutes to become publicly visible. The
+  publisher checks pending packages together for up to ten minutes, with waits
+  increasing from ten to thirty seconds. Missing versions never cause tag
+  promotion; read errors and integrity mismatches still fail immediately.
 - The workflow serializes releases and does not cancel a running publication.
   It refuses to move `latest`/`next` backwards. Tarballs and the manifest are
   retained as GitHub Actions artifacts for 14 days.
@@ -104,7 +108,42 @@ Local validation passed, including the complete release pipeline on Node
 - Zero-vulnerability framework audit. Updated the existing development-only
   Handlebars lockfile entry from 4.7.9 to 4.7.10 for newly reported advisories.
 
-No GitHub Actions execution or live npm/OIDC publication has been performed.
-Those require committed/pushed source, the npm trusted publisher configuration,
-the Serverless Actions secret, and a published GitHub Release. No source commit,
-Git tag, npm version or npm distribution-tag change was made by this task.
+The initial implementation task did not perform a GitHub Actions execution or
+live npm/OIDC publication, commit source, create a Git tag or change registry
+versions or tags.
+
+## First deployed release and processing-delay fix — 2026-10-09
+
+The maintainer ran the trusted GitHub release workflow for `v0.2.0`. All three
+uploads succeeded with provenance, but the original visibility check allowed
+only six reads two seconds apart (about ten seconds of waits). npm was still
+processing the versions, so the job correctly withheld promotion but timed out
+too soon. The maintainer subsequently confirmed all three `0.2.0` versions were
+available under `release-0.2.0`, with their old `latest` tags unchanged.
+Read-only registry checks during this fix independently confirmed that state.
+
+Recovery does not require a new package version or moving the existing tag:
+
+1. Ensure **Allow npm dist-tag** is enabled on the trusted publisher for each
+   package, in addition to permission to publish.
+2. In GitHub Actions, open the failed release run and choose **Re-run failed
+   jobs**. Now-visible uploads are skipped after an integrity check; the job
+   proceeds to promote all three `latest` tags to `0.2.0`.
+3. Verify with `npm dist-tag ls` for each package.
+
+The old release's script can recover now that npm has processed the packages;
+committing the wait fix is for future releases. A rerun uses the original
+release commit, so keep `v0.2.0` in place. No manual registry writes were
+performed while preparing this fix.
+
+The visibility wait now allows a shared ten-minute budget. All 20 release tests
+pass, including simulated multi-minute delays, exhaustion without promotion,
+recovery without duplicate uploads, late integrity conflicts and registry read
+errors during processing, on both Node 20 and Node 24. Repacking with the
+workflow's npm 11.21.0 produced the exact SHA-512 integrity recorded by the live
+registry for all three packages.
+
+After recovery, the maintainer supplied `npm dist-tag ls` output confirming that
+**common, client and server all have `latest: 0.2.0`** and
+`release-0.2.0: 0.2.0`. The synchronized `0.2.0` registry release is complete.
+The longer visibility wait remains a source change for future releases.
