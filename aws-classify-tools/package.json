@@ -18,7 +18,7 @@
     "aws-classify": "bin/aws-classify.cjs"
   },
   "scripts": {
-    "test": "node --test test"
+    "test": "node --test test/*.test.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-cloudformation": "^3.1146.0",
