@@ -1,0 +1,37 @@
+{
+  "name": "aws-classify-tools",
+  "version": "0.2.1",
+  "description": "Development and deployment commands for aws-classify applications",
+  "main": "./lib/cli.cjs",
+  "license": "MIT",
+  "author": "Sam Elsamman",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/selsamman/aws-classify.git",
+    "directory": "aws-classify-tools"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "bin": {
+    "aws-classify": "bin/aws-classify.cjs"
+  },
+  "scripts": {
+    "test": "node --test test"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudformation": "^3.1146.0",
+    "@aws-sdk/client-cloudfront": "^3.1146.0",
+    "@aws-sdk/client-dynamodb": "^3.1146.0",
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@aws-sdk/client-sts": "^3.1146.0",
+    "dynalite": "^4.0.0",
+    "mime-types": "^3.0.0",
+    "serverless": "^4.43.0",
+    "serverless-offline": "^14.8.2"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

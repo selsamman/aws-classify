@@ -49,13 +49,16 @@ async function publishRelease({root, tag, prerelease, dryRun = false, runNpm,
         const tarball = path.join(directory, record.filename);
         const integrity = 'sha512-' + createHash('sha512').update(fs.readFileSync(tarball)).digest('base64');
         if (record.integrity !== integrity) throw new Error(`Packed integrity mismatch for ${item.data.name}.`);
-        for (const entry of [item.data.main, item.data.module, item.data.types]) {
+        for (const entry of [item.data.main, item.data.module, item.data.types].filter(Boolean)) {
             if (!entry || !record.files.some(file => file.path === entry.replace(/^\.\//, ''))) {
                 throw new Error(`${item.data.name} is missing a built entry point; run npm run build.`);
             }
         }
         if (item.data.name === 'aws-classify-server' && !record.files.some(file => file.path === 'yml/functions-authenticated.yml')) {
             throw new Error('Server tarball is missing the authenticated configuration.');
+        }
+        if (item.data.name === 'aws-classify-tools' && !record.files.some(file => file.path === 'bin/aws-classify.cjs')) {
+            throw new Error('Tools tarball is missing the aws-classify executable.');
         }
         return {...record, tarball};
     });
@@ -81,7 +84,7 @@ async function publishRelease({root, tag, prerelease, dryRun = false, runNpm,
         }
     }
     if (dryRun) {
-        log(`Dry run complete: all three packages checked. A real run promotes ${release.distTag} only after all uploads succeed.`);
+        log(`Dry run complete: all four packages checked. A real run promotes ${release.distTag} only after all uploads succeed.`);
         return records;
     }
 
@@ -123,7 +126,7 @@ async function publishRelease({root, tag, prerelease, dryRun = false, runNpm,
     if (promoted.some(tags => tags[release.distTag] !== release.version)) {
         throw new Error('Distribution tags have not all converged. Rerun the same release to finish promotion.');
     }
-    log(`All three packages published at ${release.version} (${release.distTag}).`);
+    log(`All four packages published at ${release.version} (${release.distTag}).`);
     return records;
 }
 

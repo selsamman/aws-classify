@@ -83,7 +83,7 @@ for validating a consumer outside the source checkout.
 
 ## Contributing documentation
 
-For package releases, follow [publishing the three packages together](releases.md).
+For package releases, follow [publishing the four packages together](releases.md).
 One version command synchronizes the libraries and their internal dependencies;
 one GitHub Release starts the publishing workflow.
 

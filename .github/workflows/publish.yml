@@ -71,7 +71,7 @@ jobs:
       - name: Audit framework dependencies
         run: npm run audit
 
-      - name: Publish common, client and server as one release
+      - name: Publish all aws-classify packages as one release
         run: npm run release:publish
 
       - name: Preserve release tarballs and manifest

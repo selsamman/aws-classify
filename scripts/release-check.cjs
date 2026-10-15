@@ -5,5 +5,5 @@ try {
     if (flag !== undefined && flag !== 'true' && flag !== 'false') throw new Error('Invalid RELEASE_PRERELEASE flag.');
     const result = checkRelease(path.resolve(__dirname, '..'), process.env.RELEASE_TAG,
         flag === undefined ? undefined : flag === 'true');
-    console.log(`Release ${result.version}: all three packages and internal references match (${result.distTag}).`);
+    console.log(`Release ${result.version}: all four packages and internal references match (${result.distTag}).`);
 } catch (error) {console.error(error.message); process.exitCode = 1;}

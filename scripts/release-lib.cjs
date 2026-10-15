@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const semver = require('semver');
 
-const packages = ['aws-classify-common', 'aws-classify-client', 'aws-classify-server'];
+const packages = ['aws-classify-common', 'aws-classify-client', 'aws-classify-server', 'aws-classify-tools'];
 const dependencyFields = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'];
 const readJson = filename => JSON.parse(fs.readFileSync(filename, 'utf8'));
 const json = value => JSON.stringify(value, null, 2) + '\n';
@@ -58,7 +58,7 @@ function checkRelease(root, tag, prerelease) {
             }
         }
     }
-    for (const item of selected.slice(1)) {
+    for (const item of selected.filter(item => item.data.name === 'aws-classify-client' || item.data.name === 'aws-classify-server')) {
         if (item.data.dependencies?.['aws-classify-common'] !== version) {
             throw new Error(`${item.data.name} must depend on aws-classify-common@${version}.`);
         }

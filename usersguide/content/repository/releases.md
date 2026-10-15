@@ -1,5 +1,5 @@
 ---
-title: Publish the three packages together
+title: Publish the four packages together
 description: Choose one version and release common, client and server through one GitHub workflow.
 ---
 
@@ -46,7 +46,7 @@ npm run release:version -- 0.2.0
 npm run release:check
 ```
 
-The first command updates all three library `version` fields, every workspace
+The first command updates all four library `version` fields, every workspace
 reference to those libraries, and the root lockfile. Client and server depend on
 the **exact same version** of common. The command leaves private package versions
 alone and does not create a Git commit or tag.
@@ -66,7 +66,7 @@ npm run audit
 npm run release:publish -- --dry-run
 ```
 
-The dry run packs and checks all three libraries and simulates npm publication.
+The dry run packs and checks all four libraries and simulates npm publication.
 It does not upload versions or change distribution tags. Review the generated
 tarballs and manifest under `.test-results/release/<version>/` if needed.
 
@@ -77,11 +77,11 @@ ordinary push does not publish packages.
 
 The workflow repeats the checks, then:
 
-1. Builds and packs all three packages from the same release commit.
+1. Builds and packs all four packages from the same release commit.
 2. Checks registry versions and contents before the first upload.
 3. Publishes common, client and server under `release-<version>`.
-4. Verifies that all three uploaded versions match the packed contents.
-5. Points all three `latest` tags at that version.
+4. Verifies that all four uploaded versions match the packed contents.
+5. Points all four `latest` tags at that version.
 
 Only one release job runs at a time. GitHub retains the tarballs and manifest
 as an Actions artifact, including after a failed publishing attempt.
@@ -94,7 +94,7 @@ their integrity matches the newly built tarballs. Different contents at an
 existing version require a new version; npm versions are immutable.
 
 npm may take several minutes to process successful uploads. The publisher waits
-up to ten minutes for all three versions to become visible before updating tags.
+up to ten minutes for all four versions to become visible before updating tags.
 If it times out, wait for npm processing to finish, then open the failed run in
 GitHub Actions and choose **Re-run failed jobs**. Ensure **Allow npm dist-tag** is
 enabled for each package's trusted publisher; permission to publish alone does

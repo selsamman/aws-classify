@@ -39,7 +39,9 @@ custom:
   stage: ${opt:stage, 'dev'}
   # A session-table namespace; it does not require a DNS name.
   domainName: ${self:service}-${self:custom.stage}
-  bucketName: ${self:service}-${self:custom.stage}-${aws:accountId}
+  # aws-classify-tools supplies the account suffix for cloud commands and uses
+  # "local" for offline runs, so this remains fully local-friendly.
+  bucketName: ${self:service}-${self:custom.stage}-${env:AWS_CLASSIFY_ACCOUNT_ID, 'local'}
   serverless-offline:
     host: 127.0.0.1
     httpPort: 4000
@@ -81,39 +83,40 @@ dispatch and socket handlers, the DynamoDB session table, and an S3/CloudFront
 website. Add [authentication](../guides/authentication.md) before using those
 endpoints for protected application operations.
 
-## Build, deploy and upload your frontend
+## Build, deploy and publish your frontend
 
-From your project root, build the frontend with its existing build command:
-
-```bash
-npm run build --workspace web
-```
-
-From `cloud`, resolve the configuration and deploy:
+Install the project tooling at the project root. It is a development dependency:
+it is not included in the Lambda deployment artifact and it does not require a
+global AWS CLI installation.
 
 ```bash
-npx serverless print --stage dev
-npx serverless deploy --stage dev
-npx serverless info --stage dev --verbose
+npm install --save-dev aws-classify-tools
 ```
 
-The CloudFormation outputs include `WebsiteUrl` and `CloudFrontId`. Deploying the
-stack does not upload your frontend build. With AWS CLI configured, upload that
-build to the bucket named by `custom.bucketName`, then invalidate the distribution:
+Add scripts matching this layout to the root `package.json` (adjust `web`,
+`cloud`, and the build command if your project uses different directories):
 
-```bash
-aws s3 sync ../web/dist s3://YOUR-CONTENT-BUCKET --delete
-aws cloudfront create-invalidation --distribution-id YOUR-DISTRIBUTION-ID --paths '/*'
+```json title="package.json"
+{
+  "scripts": {
+    "cloud:offline": "aws-classify cloud offline --config cloud/serverless.yml --web web",
+    "cloud:offline:backend": "aws-classify cloud offline --config cloud/serverless.yml --backend-only",
+    "cloud:deploy:dev": "npm run build --workspace web && aws-classify cloud deploy --config cloud/serverless.yml --stage dev --publish --source web/dist",
+    "cloud:deploy:prod": "npm run build --workspace web && aws-classify cloud deploy --config cloud/serverless.yml --stage prod --publish --source web/dist",
+    "cloud:remove:dev": "aws-classify cloud remove --config cloud/serverless.yml --stage dev"
+  }
+}
 ```
 
-Use your frontend's actual output directory if it is not `web/dist`. The upload
-command makes that content bucket match the build directory; use the bucket
-created for this application. Open `https://<WebsiteUrl>` and try your first call.
-The relative `/api/dispatch` URL now shares the website's origin through CloudFront.
+Then deploy with `npm run cloud:deploy:dev`. The tool resolves the Serverless
+configuration using Serverless itself, reads the deployed CloudFormation outputs,
+uploads the frontend to `ContentBucket`, deletes stale files, and invalidates the
+reported `CloudFrontId`. The service name, stack name, bucket, and distribution
+are therefore not duplicated in `package.json`.
 
-The chat example automates the build/upload/invalidation sequence. Its scripts
-are an option when you want a runnable starting point; manual deployment is
-fully supported.
+Use your frontend's actual output directory if it is not `web/dist`. Open the
+reported `WebsiteUrl` and try your first call. The relative `/api/dispatch` URL
+now shares the website's origin through CloudFront.
 
 ## Use an existing host or service
 
@@ -129,12 +132,11 @@ in the [configuration reference](../reference/serverless.md).
 
 ## Remove a development deployment
 
-Empty its content bucket before removing the stack, because CloudFormation
-cannot remove a nonempty S3 bucket:
+Use the matching remove command, which empties the content bucket it discovers
+from CloudFormation before removing the stack:
 
 ```bash
-aws s3 rm s3://YOUR-CONTENT-BUCKET --recursive
-npx serverless remove --stage dev
+npm run cloud:remove:dev
 ```
 
 These commands remove that stage's website and session data. Confirm the names

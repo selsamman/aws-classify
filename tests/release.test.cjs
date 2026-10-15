@@ -51,7 +51,7 @@ function fakeRegistry(root, version = '0.2.0') {
                 const record = {name, version, filename: `${name}-${version}.tgz`,
                     integrity: 'sha512-' + createHash('sha512').update(content).digest('base64'),
                     files: (state.omitEntry ? [] : ['lib/cjs/index.js', 'lib/esm/index.js', 'lib/esm/index.d.ts',
-                        'yml/functions-authenticated.yml']).map(file => ({path: file}))};
+                        'yml/functions-authenticated.yml', 'bin/aws-classify.cjs']).map(file => ({path: file}))};
                 fs.writeFileSync(path.join(directory, record.filename), content);
                 records.set(path.join(directory, record.filename), record);
                 return JSON.stringify([record]);
@@ -67,7 +67,7 @@ function fakeRegistry(root, version = '0.2.0') {
             }
             if (args[0] === 'dist-tag') {
                 const [name, value] = args[2].split('@');
-                assert.equal(state.versions.size, 3, 'all versions must exist before promotion');
+                assert.equal(state.versions.size, packages.length, 'all versions must exist before promotion');
                 if (state.failPromotion === name) throw new Error('simulated promotion failure');
                 state.calls.push(['promote', name, args[3]]);
                 state.tags.get(name)[args[3]] = value;
@@ -119,11 +119,11 @@ test('stale common references and stale lockfile entries are rejected', t => {
     assert.throws(() => checkRelease(root), /Lockfile version/);
 });
 
-test('a successful release uploads all three before promoting any distribution tag', async t => {
+test('a successful release uploads all packages before promoting any distribution tag', async t => {
     const {state, options} = fakeRegistry(fixture(t));
     await publishRelease(options);
-    assert.deepEqual(state.calls.map(call => call[0]), ['publish', 'publish', 'publish', 'promote', 'promote', 'promote']);
-    assert.deepEqual(state.calls.slice(0, 3).map(call => call[1]), packages);
+    assert.deepEqual(state.calls.map(call => call[0]), [...packages.map(() => 'publish'), ...packages.map(() => 'promote')]);
+    assert.deepEqual(state.calls.slice(0, packages.length).map(call => call[1]), packages);
     for (const tags of state.tags.values()) assert.equal(tags.latest, '0.2.0');
 });
 
@@ -135,7 +135,7 @@ test('a failed upload does not promote latest and rerunning resumes the missing 
     state.failPublish = undefined;
     await publishRelease(options);
     assert.equal(state.calls.filter(call => call[0] === 'publish' && call[1] === packages[0]).length, 1);
-    assert.equal(state.versions.size, 3);
+    assert.equal(state.versions.size, packages.length);
 });
 
 test('a failed tag promotion can be repaired without republishing immutable versions', async t => {
@@ -144,7 +144,7 @@ test('a failed tag promotion can be repaired without republishing immutable vers
     assert.equal(state.tags.get(packages[2]).latest, '0.1.0');
     state.failPromotion = undefined;
     await publishRelease(options);
-    assert.equal(state.calls.filter(call => call[0] === 'publish').length, 3);
+    assert.equal(state.calls.filter(call => call[0] === 'publish').length, packages.length);
     for (const tags of state.tags.values()) assert.equal(tags.latest, '0.2.0');
 });
 
@@ -164,7 +164,7 @@ test('older releases cannot roll distribution tags back', async t => {
 test('a newer release appearing at the promotion boundary blocks rollback', async t => {
     const {state, options} = fakeRegistry(fixture(t)); let reads = 0;
     const getTags = options.getTags;
-    options.getTags = async name => {reads++; return reads > 3 ? {latest: '0.3.0'} : getTags(name);};
+    options.getTags = async name => {reads++; return reads > packages.length ? {latest: '0.3.0'} : getTags(name);};
     await assert.rejects(publishRelease(options), /newer latest/);
     assert.equal(state.calls.filter(call => call[0] === 'promote').length, 0);
 });
@@ -179,7 +179,7 @@ test('dry runs never publish versions or change distribution tags', async t => {
     const {state, options} = fakeRegistry(fixture(t));
     await publishRelease({...options, dryRun: true});
     assert.equal(state.versions.size, 0);
-    assert.deepEqual(state.calls.map(call => call[0]), ['dry-run', 'dry-run', 'dry-run']);
+    assert.deepEqual(state.calls.map(call => call[0]), packages.map(() => 'dry-run'));
 });
 
 test('registry read errors stop publication rather than treating failures as missing versions', async t => {
@@ -231,12 +231,12 @@ test('unavailable uploads time out after one shared ten-minute budget without ta
     options.getVersion = async () => null;
     await assert.rejects(publishRelease(options), /after ten minutes.*no tags were promoted/);
     assert.equal(options.now(), 600000);
-    assert.equal(state.calls.filter(call => call[0] === 'publish').length, 3);
+    assert.equal(state.calls.filter(call => call[0] === 'publish').length, packages.length);
     assert.equal(state.calls.filter(call => call[0] === 'promote').length, 0);
     for (const tags of state.tags.values()) assert.equal(tags.latest, '0.1.0');
     options.getVersion = getVersion;
     await publishRelease(options);
-    assert.equal(state.calls.filter(call => call[0] === 'publish').length, 3);
+    assert.equal(state.calls.filter(call => call[0] === 'publish').length, packages.length);
     for (const tags of state.tags.values()) assert.equal(tags.latest, '0.2.0');
 });
 

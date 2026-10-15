@@ -84,6 +84,9 @@ Resources:
                 - CloudFrontDistribution
                 - DomainName
 Outputs:
+  ContentBucket:
+    Description: Content bucket
+    Value: !Ref S3Bucket
   CloudFrontId:
     Description: CloudFront Id
     Value: !Ref CloudFrontDistribution

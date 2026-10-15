@@ -4,16 +4,20 @@ const {tmpdir} = require('node:os');
 const {join, resolve} = require('node:path');
 const {execFileSync} = require('node:child_process');
 const root=resolve(__dirname,'..'), dir=mkdtempSync(join(tmpdir(),'aws-classify-consumer-'));
-const run=(cmd,args,cwd=dir) => execFileSync(cmd,args,{cwd,stdio:'inherit'});
+const npmEnvironment={...process.env,npm_config_cache:join(dir,'npm-cache')};
+const run=(cmd,args,cwd=dir) => execFileSync(cmd,args,{cwd,stdio:'inherit',env:npmEnvironment});
 try {
-    const dependencies={};
+    const dependencies={}, devDependencies={};
     for(const name of ['common','client','server']) {
         const pkg=`aws-classify-${name}`;
-        const result=JSON.parse(execFileSync('npm',['pack','--ignore-scripts','--json','--pack-destination',dir],{cwd:join(root,pkg),encoding:'utf8'}));
+        const result=JSON.parse(execFileSync('npm',['pack','--ignore-scripts','--json','--pack-destination',dir],{cwd:join(root,pkg),encoding:'utf8',env:npmEnvironment}));
         dependencies[pkg]=`file:${join(dir,result[0].filename)}`;
     }
-    writeFileSync(join(dir,'package.json'),JSON.stringify({private:true,dependencies}));
+    const toolResult=JSON.parse(execFileSync('npm',['pack','--ignore-scripts','--json','--pack-destination',dir],{cwd:join(root,'aws-classify-tools'),encoding:'utf8',env:npmEnvironment}));
+    devDependencies['aws-classify-tools']=`file:${join(dir,toolResult[0].filename)}`;
+    writeFileSync(join(dir,'package.json'),JSON.stringify({private:true,dependencies,devDependencies}));
     run('npm',['install','--ignore-scripts','--no-audit','--no-fund']);
+    run(join(dir,'node_modules/.bin/aws-classify'),['--help']);
     const source=`
 import {ClassifyClient, LoginRequiredError, AuthenticationChangedError} from 'aws-classify-client';
 import type {ManagedAuthenticationOptions, AuthorizationRequest, LocalLogoutResult} from 'aws-classify-client';
@@ -70,5 +74,5 @@ const resolver=require('aws-classify-server/yml/authentication-config');
 `]);
     writeFileSync(join(dir,'browser.ts'),`import {ClassifyClient} from 'aws-classify-client'; import {reqBody} from 'aws-classify-client/lib/esm/aws-classify-common'; console.log(new ClassifyClient(async () => '',async () => {}),reqBody);`);
     run(process.execPath,[join(root,'node_modules/esbuild/bin/esbuild'),'browser.ts','--bundle','--platform=browser','--outfile=browser.js']);
-    console.log('Packed consumer: legacy constructors/callbacks, exports/subpaths, types, CJS runtime and browser bundling passed.');
+    console.log('Packed consumer: library compatibility, browser bundling and the aws-classify tools CLI passed.');
 } finally {rmSync(dir,{recursive:true,force:true});}

@@ -1,7 +1,7 @@
 # Synchronized npm releases
 
 The release workflow is `.github/workflows/publish.yml`. Publishing a GitHub
-Release triggers one job for common, client and server. It publishes the library
+Release triggers one job for common, client, server, and tools. It publishes the library
 workspaces explicitly, never the private root package. Source changes are not
 automatically committed or tagged by the version tools.
 
@@ -15,7 +15,7 @@ workspace folder in `repository.directory`. The repository URL must match the
 GitHub repository performing the trusted publication. These fields are included
 in the packed package metadata.
 
-Configure a trusted publisher on **each** of the three npm packages:
+Configure a trusted publisher on **each** of the four npm packages:
 
 - GitHub owner `selsamman`, repository `aws-classify`, workflow `publish.yml`.
 - No GitHub environment name (the workflow does not set one).
@@ -45,7 +45,7 @@ npm run audit
 npm run release:publish -- --dry-run
 ```
 
-The version command updates all three public package versions, exact internal
+The version command updates all four public package versions, exact internal
 references (including private test consumers), and existing workspace lockfile
 entries without changing unrelated locked dependencies. It refuses malformed
 versions, build metadata and downgrades. Private workspace versions stay as they
@@ -60,15 +60,15 @@ the **tag** must be `v<package-version>`.
 
 - Builds, typechecks, regression tests, release failure/recovery tests, packed
   consumer checks and dependency audit run before registry writes.
-- The publisher creates all three tarballs before uploading. It verifies built
+- The publisher creates all four tarballs before uploading. It verifies built
   entry points and server configuration files, computes SHA-512 integrity, and
   records a manifest under `.test-results/release/<version>/`.
-- All three registry versions are inspected before any upload. Existing versions
+- All four registry versions are inspected before any upload. Existing versions
   are skipped only if their integrity matches. Read failures are not interpreted
   as missing packages. Conflicting existing content fails the release.
-- Uploads occur in dependency order: **common, client, server**, under the
+- Uploads occur in dependency order: **common, client, server, tools**, under the
   version-specific `release-<version>` tag. Stable/prerelease promotion starts
-  only after all three registry versions match the packed content.
+  only after all four registry versions match the packed content.
 - Successful uploads may take several minutes to become publicly visible. The
   publisher checks pending packages together for up to ten minutes, with waits
   increasing from ten to thirty seconds. Missing versions never cause tag
@@ -100,7 +100,7 @@ Local validation passed, including the complete release pipeline on Node
   failures, missing build output and eventual registry visibility.
 - Framework build/typechecks and all 120 existing offline regression checks.
 - Packed consumer compatibility against synchronized library tarballs.
-- npm publish dry runs for all three actual tarballs, with public registry
+- npm publish dry runs for all four actual tarballs, with public registry
   preflight reads and no registry writes.
 - Packed tarball integrity was identical between the existing Node 20/npm 10
   environment and the workflow's Node 24/npm 11 environment.
@@ -141,7 +141,7 @@ pass, including simulated multi-minute delays, exhaustion without promotion,
 recovery without duplicate uploads, late integrity conflicts and registry read
 errors during processing, on both Node 20 and Node 24. Repacking with the
 workflow's npm 11.21.0 produced the exact SHA-512 integrity recorded by the live
-registry for all three packages.
+registry for all four packages.
 
 After recovery, the maintainer supplied `npm dist-tag ls` output confirming that
 **common, client and server all have `latest: 0.2.0`** and
