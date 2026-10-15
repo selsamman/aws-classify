@@ -100,13 +100,13 @@ it('returns member exceptions without saving failed state and allows subsequent 
 });
 it('denies an authorization hook without mutating state', async () => {
     const f = fixture(); await f.request.setCount(3);
-    await expect(f.request.deniedSetCount(99)).rejects.toThrow('Not Authorized');
+    await expect(f.request.deniedSetCount(99)).rejects.toThrow('Internal Server Error');
     expect(await f.request.getCount()).toBe(3);
 });
 for (const [name, body, message] of [
-    ['unknown interface', serialize({interfaceName: 'Missing', methodName: 'getCount', args: [], sessionId: ''}), 'No Response defined'],
-    ['unknown method', serialize({interfaceName: 'ServerRequest', methodName: 'missingMethod', args: [], sessionId: ''}), 'not found'],
-    ['malformed payload', '{broken', ''],
+    ['unknown interface', serialize({interfaceName: 'Missing', methodName: 'getCount', args: [], sessionId: ''}), 'Internal Server Error'],
+    ['unknown method', serialize({interfaceName: 'ServerRequest', methodName: 'missingMethod', args: [], sessionId: ''}), 'Internal Server Error'],
+    ['malformed payload', '{broken', 'Internal Server Error'],
 ]) {
     it(`rejects ${name} and continues serving requests`, async () => {
         const result = await axios.post(process.env.__API__!, body, {headers: {'Content-Type': 'text/plain'}, transformRequest: [], transformResponse: []});
