@@ -6,7 +6,6 @@ custom:
     authorizer:
       name: applicationJwt
       scopes: [example/invoke]
-    publicSuffix: Public
   directories:
     responseHandlers: src/responses/index
     includeFiles: ../node_modules/aws-classify-server/yml

@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="generator" content="Docusaurus v3.10.2">
 <title data-rh="true">Client API | aws-classify</title><meta data-rh="true" name="viewport" content="width=device-width,initial-scale=1"><meta data-rh="true" name="twitter:card" content="summary_large_image"><meta data-rh="true" property="og:url" content="https://selsamman.github.io/aws-classify/reference/client/"><meta data-rh="true" property="og:locale" content="en"><meta data-rh="true" name="docusaurus_locale" content="en"><meta data-rh="true" name="docsearch:language" content="en"><meta data-rh="true" name="docusaurus_version" content="current"><meta data-rh="true" name="docusaurus_tag" content="docs-default-current"><meta data-rh="true" name="docsearch:version" content="current"><meta data-rh="true" name="docsearch:docusaurus_tag" content="docs-default-current"><meta data-rh="true" property="og:title" content="Client API | aws-classify"><meta data-rh="true" name="description" content="ClassifyClient construction, calls, notifications and authentication options."><meta data-rh="true" property="og:description" content="ClassifyClient construction, calls, notifications and authentication options."><link data-rh="true" rel="icon" href="/aws-classify/img/logo.svg"><link data-rh="true" rel="canonical" href="https://selsamman.github.io/aws-classify/reference/client/"><link data-rh="true" rel="alternate" href="https://selsamman.github.io/aws-classify/reference/client/" hreflang="en"><link data-rh="true" rel="alternate" href="https://selsamman.github.io/aws-classify/reference/client/" hreflang="x-default"><script data-rh="true" type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Client API","item":"https://selsamman.github.io/aws-classify/reference/client"}]}</script><link rel="stylesheet" href="/aws-classify/assets/css/styles.19c74a1e.css">
-<script src="/aws-classify/assets/js/runtime~main.452a3334.js" defer="defer"></script>
-<script src="/aws-classify/assets/js/main.2e6309ad.js" defer="defer"></script>
+<script src="/aws-classify/assets/js/runtime~main.412ccfdf.js" defer="defer"></script>
+<script src="/aws-classify/assets/js/main.b3f430a5.js" defer="defer"></script>
 </head>
 <body>
 <svg style="display: none;"><defs>
@@ -34,8 +34,9 @@ logout also closes it and invalidates pending socket work. Follow
 <a class="" href="/aws-classify/guides/notifications/">the notification chapter</a> for reconnection.</p>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="shared-authentication-routing">Shared authentication routing<a href="#shared-authentication-routing" class="hash-link" aria-label="Direct link to Shared authentication routing" title="Direct link to Shared authentication routing" translate="no">​</a></h2>
 <p>Both authenticated modes accept:</p>
-<table><thead><tr><th>Option</th><th>Meaning</th></tr></thead><tbody><tr><td><code>publicSuffix</code></td><td>Required nonempty identifier suffix; must match server configuration</td></tr><tr><td><code>publicURL</code></td><td>Optional public dispatch URL; defaults to protected URL plus <code>/public</code></td></tr><tr><td><code>getPublicSession</code>, <code>setPublicSession</code></td><td>Optional paired callbacks for separate anonymous session persistence</td></tr></tbody></table>
-<p>Public calls are identified by the exposed method suffix. They omit Authorization
+<table><thead><tr><th>Option</th><th>Meaning</th></tr></thead><tbody><tr><td><code>publicURL</code></td><td>Optional public dispatch URL; defaults to protected URL plus <code>/public</code></td></tr><tr><td><code>publicMethods</code></td><td>Plain-JavaScript fallback list matching <code>registerResponse(..., {publicMethods})</code></td></tr><tr><td><code>getPublicSession</code>, <code>setPublicSession</code></td><td>Optional paired callbacks for separate anonymous session persistence</td></tr></tbody></table>
+<p>Public calls are identified by <code>@Public()</code> on the shared request class, or by the
+plain-JavaScript fallback list. They omit Authorization
 and use an independent session, in client-local memory unless those callbacks
 are supplied. Never share protected and public session storage.</p>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="external-token-mode">External-token mode<a href="#external-token-mode" class="hash-link" aria-label="Direct link to External-token mode" title="Direct link to External-token mode" translate="no">​</a></h2>

@@ -9,7 +9,9 @@ custom:
   stage: ${opt:stage, 'dev'}
   # A session-table namespace; it does not require a DNS name.
   domainName: ${self:service}-${self:custom.stage}
-  bucketName: ${self:service}-${self:custom.stage}-${aws:accountId}
+  # aws-classify-tools supplies the account suffix for cloud commands and uses
+  # "local" for offline runs, so this remains fully local-friendly.
+  bucketName: ${self:service}-${self:custom.stage}-${env:AWS_CLASSIFY_ACCOUNT_ID, 'local'}
   serverless-offline:
     host: 127.0.0.1
     httpPort: 4000
