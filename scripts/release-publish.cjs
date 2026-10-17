@@ -122,6 +122,9 @@ async function publishRelease({root, tag, prerelease, dryRun = false, runNpm,
     for (const record of records) {
         runNpm(['dist-tag', 'add', `${record.name}@${record.version}`, release.distTag, '--registry', registry]);
     }
+    // npm's dist-tag endpoint can briefly return the prior value after a successful write.
+    // Keep this deliberately simple; increase the delay if registry behavior requires it.
+    await wait(10000);
     const promoted = await Promise.all(records.map(record => getTags(record.name)));
     if (promoted.some(tags => tags[release.distTag] !== release.version)) {
         throw new Error('Distribution tags have not all converged. Rerun the same release to finish promotion.');

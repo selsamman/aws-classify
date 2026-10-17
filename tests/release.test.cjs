@@ -37,10 +37,10 @@ function edit(root, filename, change) {
 function fakeRegistry(root, version = '0.2.0') {
     let elapsed = 0;
     const state = {versions: new Map(), tags: new Map(packages.map(name => [name, {latest: '0.1.0'}])),
-        calls: [], failPublish: undefined, failPromotion: undefined, omitEntry: false};
+        calls: [], waits: [], failPublish: undefined, failPromotion: undefined, omitEntry: false};
     const records = new Map();
     const options = {root, tag: `v${version}`, prerelease: version.includes('-'), log: () => {},
-        now: () => elapsed, wait: async ms => {elapsed += ms;},
+        now: () => elapsed, wait: async ms => {state.waits.push(ms); elapsed += ms;},
         getVersion: async name => state.versions.get(name) || null,
         getTags: async name => ({...state.tags.get(name)}),
         runNpm(args) {
@@ -124,6 +124,7 @@ test('a successful release uploads all packages before promoting any distributio
     await publishRelease(options);
     assert.deepEqual(state.calls.map(call => call[0]), [...packages.map(() => 'publish'), ...packages.map(() => 'promote')]);
     assert.deepEqual(state.calls.slice(0, packages.length).map(call => call[1]), packages);
+    assert.equal(state.waits.at(-1), 10000);
     for (const tags of state.tags.values()) assert.equal(tags.latest, '0.2.0');
 });
 
@@ -210,7 +211,7 @@ test('minutes of npm processing delay do not cause early failure or tag promotio
     const waits = [];
     const wait = options.wait;
     options.wait = async ms => {
-        assert.equal(state.calls.filter(call => call[0] === 'promote').length, 0);
+        if (options.now() < 300000) assert.equal(state.calls.filter(call => call[0] === 'promote').length, 0);
         waits.push(ms);
         await wait(ms);
     };
