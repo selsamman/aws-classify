@@ -107,5 +107,6 @@ Errors from response methods reject the client call, so handle them as you
 would any other asynchronous operation. TypeScript describes the contract;
 your server implementation still validates input.
 
-These calls need a running backend. Continue with
-[local development](local-development.md) or [AWS deployment](deployment.md).
+These calls need a running backend. First add the
+[Serverless configuration](deployment.md); then you can [run it locally](local-development.md)
+or deploy it to AWS.

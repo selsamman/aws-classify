@@ -40,7 +40,7 @@ are tracked.
 | Location | Content |
 | --- | --- |
 | `usersguide/content/getting-started` | Friendly step-by-step manual setup |
-| `usersguide/content/existing-projects.md` | Incremental adoption in an existing application |
+| `usersguide/content/existing-projects.md` | Advanced integration with retained frontend hosting or Serverless services |
 | `usersguide/content/guides` | Optional features and platform-specific instructions |
 | `usersguide/content/reference` | APIs and configuration lookup |
 | `usersguide/content/repository` | Working on the framework and publishing documentation |

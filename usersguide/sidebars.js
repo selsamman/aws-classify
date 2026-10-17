@@ -4,16 +4,16 @@ export default {
     {type: 'category', label: 'Start a project', items: [
       'getting-started/project-layout',
       'getting-started/first-call',
-      'getting-started/local-development',
       'getting-started/deployment',
+      'getting-started/local-development',
     ]},
-    'existing-projects',
     {type: 'category', label: 'Add features', items: [
       'guides/notifications',
       'guides/authentication',
       'guides/mobile',
       'guides/custom-domain',
     ]},
+    {type: 'category', label: 'Advanced configuration', items: ['existing-projects']},
     'examples',
     {type: 'category', label: 'Reference', items: [
       'reference/client',

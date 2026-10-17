@@ -28,7 +28,7 @@ character requirements. The starter app includes stage/account in its bucket nam
 | File | Use |
 | --- | --- |
 | `functions.yml` | Original unauthenticated HTTP/socket handlers |
-| `functions-authenticated.yml` | Protected/public HTTP dispatch and owned socket handlers; validates required authorizer/suffix configuration |
+| `functions-authenticated.yml` | Protected/public HTTP dispatch and owned socket handlers; validates required authorizer configuration |
 | `resources-dynamodb.yml` | Session table, TTL and application user association index |
 | `provider-iam.yml` | DynamoDB operations used by the session store, including deletion |
 | `apig.yml` | WebSocket API/stage endpoint expression |
@@ -54,15 +54,16 @@ custom:
 
 The name must refer to an authorizer defined under `provider.httpApi.authorizers`.
 The scopes list is optional and uses Gateway's at-least-one/OR semantics. Choose
-issuer/audience/scope requirements that admit API access tokens. Configure the
-same suffix on the client. The suffix must match `^[A-Za-z][A-Za-z0-9_]*$`.
+issuer/audience/scope requirements that admit API access tokens. Public methods
+use `@Public()` on the shared request class or matching explicit `publicMethods`
+lists on the client and server; method names do not determine public access.
 
 The functions include enables authentication on each framework handler through
-`AWS_CLASSIFY_AUTHENTICATION=true` and `AWS_CLASSIFY_PUBLIC_SUFFIX`. Its resolver
+`AWS_CLASSIFY_AUTHENTICATION=true`. Its resolver
 rejects absent authorizer definitions and unsafe full WebSocket execution tracing.
 Keep `provider.logs.websocket.fullExecutionData: false`.
 
-For an application-owned background notification Lambda, set these mode variables
+For an application-owned background notification Lambda, set `AWS_CLASSIFY_AUTHENTICATION=true`
 too, and supply the same session namespace and WebSocket endpoint. The normal
 functions include does not automatically configure unrelated producer Lambdas.
 
@@ -108,9 +109,10 @@ local ports, account for the framework's current local endpoint behavior.
 ## Hosting and existing applications
 
 Website templates create resources but do not compile or upload your frontend.
-Use your existing build/deployment scripts or the manual commands in
+Use the tools commands in
 [deployment](../getting-started/deployment.md). If you already host the client,
-omit website resources and configure the API origin/CORS instead.
+follow [advanced configuration](../existing-projects.md) for API origin/CORS
+and deployment/removal commands without the supplied website.
 
 For authenticated custom-domain hosting, maintain an application copy of the
 authenticated resource template with the domain/certificate/DNS additions.

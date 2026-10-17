@@ -16,7 +16,7 @@ npm run install:tests
 ```
 
 Use Node.js 20.19 or later. The root is a private npm workspace project linking
-the three libraries and the test applications. `install:tests` installs the root
+the four packages and the test applications. `install:tests` installs the root
 lockfile, prepares Serverless and builds the libraries. Test contracts are a
 private workspace package, not copied source.
 

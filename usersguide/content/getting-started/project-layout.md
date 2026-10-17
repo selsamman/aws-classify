@@ -4,8 +4,10 @@ description: Share request classes with private npm workspaces, without copying 
 ---
 
 Let's give the client and backend a shared vocabulary. You can follow this
-layout for a new application, or jump to [existing projects](../existing-projects.md)
-if your directories are already in place.
+layout for a new application, or see [advanced configuration](../existing-projects.md)
+for advanced integration when you must retain existing hosting or a backend
+service. Reusing your application code with the supplied deployment is usually
+the simplest starting point.
 
 ## Choose your directories
 
@@ -30,16 +32,20 @@ my-app/
     package.json
 ```
 
-`cloud`, `web` and `mobile` each have their own dependencies and scripts. Listing
-them as npm workspaces gives you one root installation and lockfile. The shared
-requests package is linked into each app automatically; no source synchronization
-or package publication is needed.
+`cloud`, `web` and `mobile` each have their own application dependencies. The
+root package owns the commands that coordinate cloud, local-development, and
+mobile tooling. Listing the apps as npm workspaces gives you one root installation
+and lockfile. The shared requests package is linked into each app automatically;
+no source synchronization or package publication is needed.
 
 ```json title="package.json"
 {
   "name": "my-classify-app",
   "private": true,
-  "workspaces": ["cloud", "web", "common/requests"]
+  "workspaces": ["cloud", "web", "common/requests"],
+  "devDependencies": {
+    "aws-classify-tools": "^0.2.2"
+  }
 }
 ```
 
@@ -82,16 +88,19 @@ commands from the repository root:
 npm install aws-classify-server js-freeze-dry --workspace cloud
 npm install aws-classify-client --workspace web
 npm install @my-app/requests@0.1.0 --workspace cloud --workspace web
-npm install --save-dev typescript serverless@4 serverless-offline --workspace cloud
+npm install --save-dev aws-classify-tools
+npm install --save-dev typescript --workspace cloud
 ```
 
 The matching private package is resolved from your workspace. The `web` package
-keeps whatever UI and build dependencies your application already uses. For a
-mobile workspace, install `aws-classify-client` and `@my-app/requests@0.1.0`
-there too.
+keeps whatever UI and build dependencies your application already uses.
+`aws-classify-tools` supplies Serverless, Serverless Offline, Dynalite, and the
+AWS SDK commands as a root development dependency, so they are not included in
+the Lambda application dependencies. For a mobile workspace, install
+`aws-classify-client` and `@my-app/requests@0.1.0` there too.
 
-Use a supported Node.js release for your selected frontend/backend tools. The
-framework repository uses Node 20.19 or later; the chat example's mobile toolchain
+Use Node.js 20.19 or later for `aws-classify-tools`, or a newer release required
+by your selected frontend/backend tools. The chat example's mobile toolchain
 has its own requirements, documented in that example.
 
 You are ready to [make your first call](first-call.md).

@@ -1,12 +1,22 @@
 ---
 title: Run locally
-description: Understand the local HTTP, WebSocket and DynamoDB pieces and use the working chat example.
+description: Configure and run the local HTTP, WebSocket, DynamoDB and frontend services.
 ---
 
 Local development uses the same request classes and response implementations.
 Three services stand in for AWS: an HTTP/WebSocket gateway from Serverless
 Offline, a local DynamoDB-compatible database, and your frontend development
 server.
+
+## Prerequisite: configure the cloud service
+
+Before starting your own project locally, save the [Serverless configuration](deployment.md)
+as `cloud/serverless.yml` and add its root `package.json` scripts. The offline
+command resolves that file to find your handlers and session-table definition;
+it cannot start from request and response code alone. Complete Serverless v4
+sign-in (or configure `SERVERLESS_ACCESS_KEY`) before running the commands;
+Serverless configuration resolution is also used locally. Real AWS credentials
+are needed for deployment, while the local backend uses dummy credentials.
 
 ## Start with a working local environment
 
@@ -15,7 +25,7 @@ Install from its root, then start the backend and web client together:
 
 ```bash
 npm install
-npm run dev --workspace cloud
+npm run cloud:offline
 ```
 
 The example starts Dynalite, creates the required table from the resolved
@@ -26,45 +36,86 @@ See the example's README for its current Node and framework prerequisites.
 For backend debugging:
 
 ```bash
-npm run dev:debug --workspace cloud
+npm run cloud:offline:debug
 ```
 
 Attach your debugger to port 9229. Restart the backend after response-code
 changes; the frontend development server handles frontend reloads.
 
-## Set up these pieces in your own project
+## Run your own project
 
-Use the [copyable Serverless configuration](deployment.md), then supply a local
-database and create the session table before starting Serverless Offline. The
-`DOMAIN` environment variable is the session-table namespace. The local table
-must be named `classifySessionStore.<DOMAIN>` and have the same keys/index as
-`resources-dynamodb.yml`.
+`aws-classify cloud offline` starts Dynalite, resolves the session-table
+definition from Serverless, creates that local table, starts Serverless Offline,
+and starts Vite when given `--web web`. It supplies local DynamoDB credentials
+and endpoint settings; it never points the local backend at a production table.
 
-Set `DD_ENDPOINT` to your local database URL (for example,
-`http://127.0.0.1:8000`) and `DD_REGION` to your development region before
-starting the backend. Those values configure the framework's DynamoDB client.
-Local SDK requests also need local dummy credentials, as supplied by the example's
-startup scripts; do not point a local development setup at a production table.
-Serverless Offline sets `IS_OFFLINE=true`; this is a local development switch.
-The chat example is a useful reference for service startup, table creation,
-shutdown and backend debugging scripts.
+Use `npm run cloud:offline:backend` when you want only the backend, including
+when your frontend uses tooling other than Vite. `--web web` specifically requires
+Vite installed in that workspace. Serverless Offline sets `IS_OFFLINE=true`;
+this is a local development switch.
 
-For a Vite frontend, proxy the relative API URL to the local backend:
+Normal offline startup initializes the database automatically. The separate
+`npm run cloud:db:init` command only creates/checks the table: it requires an
+already running DynamoDB-compatible service at `http://127.0.0.1:4567`. It does
+not start that service. The bundled offline runner uses in-memory Dynalite, so
+restarting it clears local sessions.
+
+Before starting a Vite frontend, set its port and proxy the relative API URL
+to the local backend. The tools wait for Vite on port 3000:
 
 ```ts
 // Add to your existing Vite configuration.
 server: {
+    port: 3000,
+    strictPort: true,
     proxy: {'/api': 'http://127.0.0.1:4000'},
 }
 ```
+
+Then run `npm run cloud:offline` from the project root and open
+`http://127.0.0.1:3000`.
 
 The WebSocket URL comes from the backend's `$WebSocket.$authorize` operation.
 Your frontend does not need to invent a second socket endpoint.
 
 ## Developing with authentication enabled
 
-Start dual-route offline dispatch with `serverless offline --noAuth`. That lets
-you work on protected/public routing and application behavior locally. It does
+First complete the [authenticated backend setup](../guides/authentication.md),
+including the `publicResponseHandler` export. Save a local copy of that
+configuration as `cloud/serverless-offline.yml`. In its existing
+`custom.serverless-offline` section, add `noAuth: true`; keep all the other
+local port/environment settings. This bypasses Gateway authorizers for local
+functional testing. Keep this setting in the local configuration.
+
+Set `OIDC_ISSUER_URL` and `OIDC_AUDIENCE` in your shell before starting locally
+as well as for deployment. Routing-only development can use placeholder values
+such as `https://example.invalid` and `local-api`; browser login needs real
+provider configuration. Then run from the project root:
+
+```bash
+npx aws-classify cloud offline --config cloud/serverless-offline.yml --web web
+```
+
+This starts the database, initializes the table and supplies the local backend
+environment. The tools do not forward `--noAuth` to Serverless; use the local
+YAML setting above.
+
+For routing-only work without a provider, create a local-only external-token
+client using the session callbacks from the tutorial:
+
+```ts
+const client = new ClassifyClient(getSession, setSession, '/api/dispatch', {
+    getAccessToken: async () => 'offline-development',
+});
+```
+
+Import `ClassifyClient` as in the tutorial. Mark public methods on the shared
+request class as described in [contracts](../reference/contracts.md#public-and-protected-members).
+The client still requires a nonempty token for protected calls, but the local
+`noAuth` configuration does not validate this placeholder. Use this client only
+with the local backend; deployed protected calls need real access tokens.
+
+You can work on protected/public routing locally. It does
 not give you a validated user identity or scope grants. Offline sessions carry
 an explicit unvalidated ownership marker, and the managed browser login still
 needs a real compatible provider when you exercise it.

@@ -1,9 +1,9 @@
 ---
 title: Publish the four packages together
-description: Choose one version and release common, client and server through one GitHub workflow.
+description: Choose one version and release common, client, server and tools through one GitHub workflow.
 ---
 
-The three libraries share a release version. You choose that number once;
+The four packages share a release version. You choose that number once;
 the release tools update the package files and the workflow publishes them
 together. The private repository, test workspaces and user guide are not
 published to npm.
@@ -17,7 +17,7 @@ If you maintain a fork, update this metadata as well as the trusted publisher
 settings below.
 
 For each npm package—`aws-classify-common`, `aws-classify-client` and
-`aws-classify-server`—configure a GitHub trusted publisher with these values:
+`aws-classify-server`, and `aws-classify-tools`—configure a GitHub trusted publisher with these values:
 
 | Setting | Value |
 | --- | --- |
@@ -39,7 +39,9 @@ credentials. This release workflow does not deploy AWS resources.
 
 ## Choose the version
 
-From the repository root, set an unpublished version:
+From the repository root, set your chosen unpublished version. The numbers
+below are examples: replace them with a version greater than the current
+package versions. The tool rejects downgrades.
 
 ```bash
 npm run release:version -- 0.2.0
@@ -52,7 +54,7 @@ the **exact same version** of common. The command leaves private package version
 alone and does not create a Git commit or tag.
 
 For the next release, supply the next number, such as `0.2.1`. You do not need to
-edit six dependency references by hand. The checker rejects mismatched versions,
+edit dependency references by hand. The checker rejects mismatched versions,
 stale references and lockfile drift.
 
 ## Check and publish a release
@@ -79,7 +81,7 @@ The workflow repeats the checks, then:
 
 1. Builds and packs all four packages from the same release commit.
 2. Checks registry versions and contents before the first upload.
-3. Publishes common, client and server under `release-<version>`.
+3. Publishes common, client, server and tools under `release-<version>`.
 4. Verifies that all four uploaded versions match the packed contents.
 5. Points all four `latest` tags at that version.
 
@@ -103,7 +105,7 @@ when the uploaded contents already match.
 
 An upload failure leaves `latest` unchanged. npm performs uploads and tag changes
 as individual operations, so this is not an atomic transaction. A failure during
-the final tag updates can briefly leave the three `latest` tags mixed; the same
+the final tag updates can briefly leave the four `latest` tags mixed; the same
 rerun finishes those updates without republishing identical packages. A rerun of
 an older release refuses to move a tag backwards past a newer version.
 

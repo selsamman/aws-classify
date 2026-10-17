@@ -1,11 +1,22 @@
 ---
-title: Add to an existing project
-description: Adopt aws-classify incrementally without reorganizing your existing application.
+title: Integrate with existing infrastructure
+description: Advanced configuration for retaining separate frontend hosting or an existing Serverless service.
 ---
 
-You can keep your frontend, backend and directory names. Start with one request
-class and one response implementation, then adopt the other features when you
-need them. A project generator or a copy of the chat application is not required.
+The easiest adoption path is to use the [complete tutorial configuration](getting-started/deployment.md)
+and let the supplied templates and tools manage the API, sessions and website.
+Where practical, replace overlapping hosting or API configuration with that setup
+rather than maintaining two ways to provide the same resources. Keep unrelated
+application resources and data.
+
+Use this advanced section when you need to retain a specific part of your existing
+infrastructure. Two common cases are a frontend already hosted elsewhere and an
+existing Serverless Framework service containing other functions. Neither requires
+a previous aws-classify deployment; having DNS records alone does not require
+this integration path. Arbitrary AWS stacks need application-specific integration.
+
+You can still reuse your UI and shared code with the tutorial deployment. A
+project generator or a copy of the chat application is not required.
 
 ## Choose the pieces you need
 
@@ -45,7 +56,7 @@ your build tools. Keep its `aws-classify-common` dependency from the initial
 workspace example. This solves shared imports through a package boundary; there
 is no need to copy source files with bisync.
 
-## Add one backend operation
+## Retain an existing Serverless service
 
 Follow [the first-call example](getting-started/first-call.md) for the request,
 response and registration. Export the framework handlers from a module that
@@ -62,14 +73,16 @@ The stock functions include supplies all three, or four in authenticated mode.
 If you configure HTTP-only functions manually, document that notifications are
 not available and omit calls to `initSocket()`.
 
-## Add the client where it belongs
+## Retain separate frontend hosting
 
 Create one long-lived `ClassifyClient`, provide asynchronous get/set callbacks
 for the application session ID, and create the request proxy. Keep calling your
 other APIs normally; aws-classify does not take over your frontend routing,
 application store or UI components.
 
-For an already hosted frontend, use an absolute dispatch URL:
+Omit the website resource include and `custom.bucketName` from the tutorial YAML.
+Keep the dispatch/socket functions, environment settings, permissions and session
+table. Use an absolute dispatch URL in the frontend:
 
 ```ts
 const client = new ClassifyClient(
@@ -83,6 +96,33 @@ Configure API Gateway CORS for the allowed frontend origin and the headers you
 send. In authenticated mode, provide an unauthenticated `OPTIONS /api/dispatch`
 route if your authenticated `ANY` route captures preflight. The
 [authentication chapter](guides/authentication.md) explains that case.
+
+### Deploy and remove without the supplied website
+
+The tutorial scripts assume the supplied S3/CloudFront website. For separate
+hosting, deploy only the backend from the project root:
+
+```bash
+npx aws-classify cloud deploy --config cloud/serverless.yml --stage dev
+```
+
+Leave out the frontend build and `--publish --source` arguments. Publish the
+frontend through its existing hosting process. `aws-classify cloud publish`
+requires the supplied `ContentBucket` and `CloudFrontId` stack outputs.
+
+`aws-classify cloud remove` also requires `ContentBucket`, so it cannot remove
+a backend-only stack. Install Serverless as a direct development dependency in `cloud`, then run its
+removal command from that directory:
+
+```bash
+npm install --save-dev serverless@^4 --workspace cloud
+cd cloud
+npx serverless remove --config serverless.yml --stage dev
+```
+
+This removes the entire Serverless service. If you merged aws-classify into a
+service with other functions, remove only its configuration/resources through
+your existing deployment process when those other resources must remain.
 
 ## Adopt authentication deliberately
 

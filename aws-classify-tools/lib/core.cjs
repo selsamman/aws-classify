@@ -122,6 +122,9 @@ async function publishSite({source, bucket, distributionId, region, s3 = new S3C
     }}));
     return {files: files.length, removed: stale.length};
 }
+function writeStackOutputs(output, outputs) {
+    writeFileSync(resolve(output), JSON.stringify(outputs, null, 2) + '\n');
+}
 async function publishFromStack({config, stage, source, output, region}) {
     const stack = await stackOutputs({config, stage, region});
     const bucket = stack.outputs.ContentBucket;
@@ -129,7 +132,7 @@ async function publishFromStack({config, stage, source, output, region}) {
     if (!bucket || !distributionId) throw new Error(`${stack.name} must output ContentBucket and CloudFrontId.`);
     const result = await publishSite({source, bucket, distributionId, region: stack.region});
     output ||= join(stack.resolved.cwd, 'output.json');
-    writeFileSync(resolve(output), JSON.stringify(stack.outputs, null, 2) + '\\n');
+    writeStackOutputs(output, stack.outputs);
     return {...result, ...stack, bucket, distributionId, output: resolve(output)};
 }
 function localDbClient() {
@@ -221,4 +224,4 @@ async function runExpo({project, cloudOutput, localApi, expoArgs}) {
     return new Promise((resolveExit, reject) => child.once('error', reject).once('exit', code => code === 0 ? resolveExit() : reject(new Error(`Expo exited (${code}).`))));
 }
 
-module.exports = {emptyBucket, initializeLocalDb, localDynamoEndpoint, publishFromStack, publishSite, resolvedConfig, runExpo, runOffline, runServerless, stackName, stackOutputs};
+module.exports = {emptyBucket, initializeLocalDb, localDynamoEndpoint, publishFromStack, publishSite, resolvedConfig, runExpo, runOffline, runServerless, stackName, stackOutputs, writeStackOutputs};

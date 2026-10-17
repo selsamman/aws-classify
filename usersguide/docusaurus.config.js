@@ -32,7 +32,7 @@ export default {
       logo: {alt: 'aws-classify', src: 'img/logo.svg'},
       items: [
         {type: 'doc', docId: 'getting-started/project-layout', label: 'Get started', position: 'left'},
-        {type: 'doc', docId: 'existing-projects', label: 'Existing project', position: 'left'},
+        {type: 'doc', docId: 'existing-projects', label: 'Advanced configuration', position: 'left'},
         {type: 'doc', docId: 'reference/client', label: 'Reference', position: 'left'},
         {href: 'https://github.com/selsamman/aws-classify', label: 'GitHub', position: 'right'},
       ],
@@ -42,7 +42,7 @@ export default {
       links: [
         {title: 'Build something', items: [
           {label: 'Start a project', to: '/getting-started/project-layout'},
-          {label: 'Add to your project', to: '/existing-projects'},
+          {label: 'Advanced configuration', to: '/existing-projects'},
           {label: 'Sample applications', to: '/examples'},
         ]},
         {title: 'Go further', items: [

@@ -21,7 +21,7 @@ server-to-client notifications in web and Expo clients.
 | `web/src/responses` | Browser notification implementations |
 | `web/src/store` | Client setup, local session persistence and UI state |
 | `mobile` | Expo client, native session storage and device-specific startup |
-| `cloud/scripts` | Local development, database startup and site publication |
+| root `package.json` | Local development, database startup, site publication, and mobile commands via `aws-classify-tools` |
 
 Install once from the sample repository root. Its private npm workspaces link
 the shared requests into `cloud`, `web` and `mobile`. You do not publish the

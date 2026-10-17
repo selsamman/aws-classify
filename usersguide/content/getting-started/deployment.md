@@ -83,7 +83,10 @@ dispatch and socket handlers, the DynamoDB session table, and an S3/CloudFront
 website. Add [authentication](../guides/authentication.md) before using those
 endpoints for protected application operations.
 
-## Build, deploy and publish your frontend
+This file is also required by the local-development commands: they resolve it
+to discover the handlers and local session-table definition.
+
+## Add local and deployment commands
 
 Install the project tooling at the project root. It is a development dependency:
 it is not included in the Lambda deployment artifact and it does not require a
@@ -101,6 +104,8 @@ Add scripts matching this layout to the root `package.json` (adjust `web`,
   "scripts": {
     "cloud:offline": "aws-classify cloud offline --config cloud/serverless.yml --web web",
     "cloud:offline:backend": "aws-classify cloud offline --config cloud/serverless.yml --backend-only",
+    "cloud:offline:debug": "aws-classify cloud offline --config cloud/serverless.yml --web web --debug",
+    "cloud:db:init": "aws-classify cloud db:init --config cloud/serverless.yml",
     "cloud:deploy:dev": "npm run build --workspace web && aws-classify cloud deploy --config cloud/serverless.yml --stage dev --publish --source web/dist",
     "cloud:deploy:prod": "npm run build --workspace web && aws-classify cloud deploy --config cloud/serverless.yml --stage prod --publish --source web/dist",
     "cloud:remove:dev": "aws-classify cloud remove --config cloud/serverless.yml --stage dev"
@@ -108,22 +113,27 @@ Add scripts matching this layout to the root `package.json` (adjust `web`,
 }
 ```
 
+Before deploying, [run your application locally](local-development.md).
 Then deploy with `npm run cloud:deploy:dev`. The tool resolves the Serverless
 configuration using Serverless itself, reads the deployed CloudFormation outputs,
 uploads the frontend to `ContentBucket`, deletes stale files, and invalidates the
 reported `CloudFrontId`. The service name, stack name, bucket, and distribution
 are therefore not duplicated in `package.json`.
 
+To update only the frontend after deploying the stack, build it and publish:
+
+```bash
+npm run build --workspace web
+npx aws-classify cloud publish --config cloud/serverless.yml --stage dev --source web/dist
+```
+
+Successful publication writes the stack outputs to `cloud/output.json` by default;
+use `--output <path>` on publication to choose another file. Deployment without
+`--publish` does not write this file.
+
 Use your frontend's actual output directory if it is not `web/dist`. Open the
 reported `WebsiteUrl` and try your first call. The relative `/api/dispatch` URL
 now shares the website's origin through CloudFront.
-
-## Use an existing host or service
-
-If your frontend is already hosted, omit `resources-website.yml` and the bucket
-name. Keep the functions and session table, and supply the API URL to the client.
-Cross-origin browser calls require an explicit CORS policy; authenticated calls
-also need unauthenticated preflight handling. See [existing projects](../existing-projects.md).
 
 Keep one namespace per deployment stage so development and production sessions
 do not share a table. The supplied DynamoDB IAM include grants access to all
@@ -142,6 +152,10 @@ npm run cloud:remove:dev
 These commands remove that stage's website and session data. Confirm the names
 refer to the development deployment you intend to remove. Your deployment
 artifact bucket can also retain files; inspect it after stack removal.
+
+For separate frontend hosting or an existing Serverless service, see
+[advanced configuration](../existing-projects.md). The commands above assume
+the complete supplied website/API/session-table configuration.
 
 Next, add [notifications](../guides/notifications.md),
 [OIDC authentication](../guides/authentication.md), or a

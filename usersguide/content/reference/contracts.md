@@ -45,10 +45,26 @@ when it needs transactions, large datasets or lifecycle independent of sessions.
 
 ## Public and protected members
 
-In authenticated mode the configured suffix marks anonymous methods, for
-example `getVersionPublic()`. The server enforces the entry point independently:
+In authenticated mode mark anonymous methods with `@Public()` on the shared
+request class. Import `Public` from `aws-classify-common` and enable
+`experimentalDecorators` in the TypeScript configuration used to build that
+class. For example:
+
+```ts
+import {Public, reqBody} from 'aws-classify-common';
+
+class StatusRequest {
+    static interfaceName = 'StatusRequest';
+    @Public()
+    async getVersion(): Promise<string> { return reqBody(); }
+}
+```
+
+For plain JavaScript, use matching `publicMethods` lists on server registration
+and client construction instead. The server enforces the entry point independently:
 a public route cannot call a protected method, and the protected route cannot
-call a public-suffixed method. `$WebSocket.$authorize` is always protected.
+call a public method. Method-name suffixes have no effect.
+`$WebSocket.$authorize` is always protected.
 
 TypeScript types are helpful to developers, but incoming data still crosses a
 network boundary. Validate it in server response methods and apply application

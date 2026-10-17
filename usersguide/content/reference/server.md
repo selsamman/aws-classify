@@ -9,7 +9,7 @@ Import the singleton `classifyServerless` and framework handler exports from
 ## Response registration and dispatch
 
 ```ts
-classifyServerless.registerResponse(ResponseClass, authorizationCallback?)
+classifyServerless.registerResponse(ResponseClass, authorizationCallback?, options?)
 ```
 
 The response class extends its shared request class. Register it for serialization
@@ -22,6 +22,11 @@ An optional asynchronous authorization callback receives
 `(response, methodName, args, context?)` and returns a boolean. It is application
 member policy, separate from Gateway's validation of the caller's token. Existing
 three-argument callbacks still work.
+
+For plain JavaScript, pass `{publicMethods: ['getVersion']}` as the third
+argument (use `undefined` for an absent authorization callback). Match the
+client's `publicMethods` list. Use either this list or shared `@Public()`
+decorators, not both on the same registered request class.
 
 | Export | Use |
 | --- | --- |

@@ -12,7 +12,7 @@ sign in, correct input, or refresh state.
 | Missing/unknown interface or method | Match static interface names and deployed request/response versions |
 | A response method's error | Validate the input or apply the recovery appropriate to that application method |
 | HTTP 401/403 | Gateway token signature, issuer, audience, expiry and route scopes |
-| Protected/public method refused | Match client/server suffixes and use the correct fixed dispatch entry point |
+| Protected/public method refused | Match shared `@Public()` markers or client/server `publicMethods` lists and use the correct fixed dispatch entry point |
 | Session refused after enabling auth/account change | Clear the old protected session ID; legacy/unowned or another user's state cannot be adopted |
 | Browser CORS error | Allow the frontend origin and headers; ensure OPTIONS is not captured by protected ANY dispatch |
 | WebSocket send failure | Check session existence/expiry, active attachment and producer IAM |

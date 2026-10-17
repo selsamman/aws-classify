@@ -1,9 +1,9 @@
 const assert = require('node:assert/strict');
-const {mkdtempSync, rmSync, writeFileSync} = require('node:fs');
+const {mkdtempSync, readFileSync, rmSync, writeFileSync} = require('node:fs');
 const {tmpdir} = require('node:os');
 const {join} = require('node:path');
 const test = require('node:test');
-const {publishSite, stackName} = require('../lib/core.cjs');
+const {publishSite, stackName, writeStackOutputs} = require('../lib/core.cjs');
 
 test('derives the normal Serverless stack name without duplicating it', () => {
     assert.equal(stackName({service: 'chat', provider: {}}, 'dev'), 'chat-dev');
@@ -28,5 +28,16 @@ test('publishes every source file, deletes stale keys and invalidates CloudFront
         assert(calls.some(call => call.Key === 'app.js'));
         assert(calls.some(call => call.Delete?.Objects[0].Key === 'stale.js'));
         assert(calls.some(call => call.DistributionId === 'distribution' && call.InvalidationBatch.Paths.Items[0] === '/*'));
+    } finally { rmSync(directory, {recursive: true, force: true}); }
+});
+
+// Expo consumes this file with JSON.parse after publication.
+test('published stack outputs can be read as JSON by a consumer', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'aws-classify-outputs-'));
+    try {
+        const filename = join(directory, 'output.json');
+        const outputs = {WebsiteUrl: 'example.cloudfront.net', ContentBucket: 'content', CloudFrontId: 'distribution'};
+        writeStackOutputs(filename, outputs);
+        assert.deepEqual(JSON.parse(readFileSync(filename, 'utf8')), outputs);
     } finally { rmSync(directory, {recursive: true, force: true}); }
 });

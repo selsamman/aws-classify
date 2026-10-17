@@ -20,6 +20,29 @@ Use the Node/Expo versions required by your mobile toolchain. Follow the example
 mobile README for device startup; those requirements can differ from the framework
 repository's build requirements.
 
+## Start Expo with the cloud API
+
+Add these root scripts if you use the directory names from the getting-started
+guide. `aws-classify-tools` reads the deployed `WebsiteUrl` from
+`cloud/output.json` after successful cloud publication (including deploy with
+`--publish`) and supplies it to Expo as
+`EXPO_PUBLIC_API_URL`. An explicit environment variable or a mobile `.env` file
+takes precedence.
+
+```json title="package.json"
+{
+  "scripts": {
+    "mobile:ios": "aws-classify mobile expo --project mobile --cloud-output cloud/output.json -- ios",
+    "mobile:android": "aws-classify mobile expo --project mobile --cloud-output cloud/output.json -- android",
+    "mobile:web": "aws-classify mobile expo --project mobile --cloud-output cloud/output.json -- web",
+    "mobile:ios:offline": "aws-classify mobile expo --project mobile --cloud-output cloud/output.json --local-api -- ios"
+  }
+}
+```
+
+The offline script targets `http://127.0.0.1:4000/api/dispatch`; use a reachable
+LAN address instead when running on a physical device.
+
 ## Persist the application session
 
 For React Native, asynchronous storage replaces browser `sessionStorage`:

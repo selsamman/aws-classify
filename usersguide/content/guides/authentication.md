@@ -31,7 +31,7 @@ custom:
   yml: ${self:custom.directories.includeFiles}
   stage: ${opt:stage, 'dev'}
   domainName: ${self:service}-${self:custom.stage}
-  bucketName: ${self:service}-${self:custom.stage}-${aws:accountId}
+  bucketName: ${self:service}-${self:custom.stage}-${env:AWS_CLASSIFY_ACCOUNT_ID, 'local'}
   serverless-offline:
     host: 127.0.0.1
     httpPort: 4000
@@ -78,9 +78,13 @@ resources:
 
 <Download file="serverless-authenticated.yml">Download the authenticated configuration</Download>.
 Save it as `serverless.yml`, or pass `--config serverless-authenticated.yml` to
-your Serverless commands. Set `OIDC_ISSUER_URL` and `OIDC_AUDIENCE` in the
-deployment environment. Choose the scopes your provider actually issues for
-your API; `example/invoke` is a placeholder. Multiple Gateway route scopes are
+your Serverless commands (from the project root, tools need
+`--config cloud/serverless-authenticated.yml`). Set `OIDC_ISSUER_URL` and
+`OIDC_AUDIENCE` wherever Serverless resolves this file, including local development.
+Use the tutorial's `aws-classify cloud deploy` command to supply the bucket
+account suffix; direct Serverless deployments must set `AWS_CLASSIFY_ACCOUNT_ID`
+to the target account ID themselves. Choose the scopes your provider actually
+issues for your API; `example/invoke` is a placeholder. Multiple Gateway route scopes are
 **OR**, so a token needs at least one. Require scopes appropriate for access
 tokens; do not use an ID token to call your API.
 
@@ -249,7 +253,9 @@ that route; the actual protected request still requires a valid token. See the
 [fixture implementation](https://github.com/selsamman/aws-classify/blob/master/tests/server/serverless-auth.yml)
 for the pattern.
 
-Offline `--noAuth` supports functional routing development, not verified user
-identity. Never enable `IS_OFFLINE=true` on an AWS deployment. For detailed
+Follow the [authenticated local startup recipe](../getting-started/local-development.md#developing-with-authentication-enabled)
+for database startup, environment values and local `noAuth` configuration.
+Offline authorizer bypass supports functional routing development, not verified
+user identity. Never enable `IS_OFFLINE=true` on an AWS deployment. For detailed
 storage, race, validation and security behavior, see the
 [implementation lifecycle document](https://github.com/selsamman/aws-classify/blob/master/docs/CLIENT_AUTHENTICATION_LIFECYCLE.md).
