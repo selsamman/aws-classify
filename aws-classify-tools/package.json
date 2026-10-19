@@ -1,6 +1,6 @@
 {
   "name": "aws-classify-tools",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Development and deployment commands for aws-classify applications",
   "main": "./lib/cli.cjs",
   "license": "MIT",
