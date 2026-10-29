@@ -12,3 +12,6 @@ node_modules/
 usersguide/build/
 usersguide/.docusaurus/
 usersguide/static/config/
+
+# macOS Finder metadata
+.DS_Store
