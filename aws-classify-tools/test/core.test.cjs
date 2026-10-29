@@ -3,7 +3,7 @@ const {mkdtempSync, readFileSync, rmSync, writeFileSync} = require('node:fs');
 const {tmpdir} = require('node:os');
 const {join} = require('node:path');
 const test = require('node:test');
-const {publishSite, stackName, writeStackOutputs} = require('../lib/core.cjs');
+const {publishSite, stackName, stackOutputValues, writeStackOutputs} = require('../lib/core.cjs');
 
 test('derives the normal Serverless stack name without duplicating it', () => {
     assert.equal(stackName({service: 'chat', provider: {}}, 'dev'), 'chat-dev');
@@ -40,4 +40,15 @@ test('published stack outputs can be read as JSON by a consumer', () => {
         writeStackOutputs(filename, outputs);
         assert.deepEqual(JSON.parse(readFileSync(filename, 'utf8')), outputs);
     } finally { rmSync(directory, {recursive: true, force: true}); }
+});
+
+// A first deployment can expose its resources before its outputs are available.
+test('in-progress stack operations are reported before missing/stale outputs are used', () => {
+    for (const StackStatus of ['CREATE_IN_PROGRESS', 'UPDATE_IN_PROGRESS', 'UPDATE_COMPLETE_CLEANUP_IN_PROGRESS', 'DELETE_IN_PROGRESS']) {
+        assert.throws(() => stackOutputValues({StackStatus, Outputs: [{OutputKey: 'ContentBucket', OutputValue: 'old'}]}, 'app-dev'),
+            error => error.message.includes(StackStatus) && error.message.includes('Wait for the current stack operation'));
+    }
+    assert.deepEqual(stackOutputValues({StackStatus: 'CREATE_COMPLETE', Outputs: [{OutputKey: 'ContentBucket', OutputValue: 'content'}]}, 'app-dev'), {ContentBucket: 'content'});
+    assert.deepEqual(stackOutputValues({StackStatus: 'UPDATE_COMPLETE'}, 'app-dev'), {});
+    assert.throws(() => stackOutputValues(undefined, 'app-dev'), /stack was not found: app-dev/);
 });

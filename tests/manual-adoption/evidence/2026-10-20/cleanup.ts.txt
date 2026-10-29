@@ -1,0 +1,29 @@
+/** Standalone cleanup: run after stack removal. It verifies exact account, region and ownership from the manifest. */
+import { readFile, rm } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import {
+  CognitoIdentityProviderClient, DeleteResourceServerCommand, DeleteUserCommand,
+  DeleteUserPoolClientCommand, DeleteUserPoolCommand, DeleteUserPoolDomainCommand,
+  DescribeUserPoolCommand,
+} from '@aws-sdk/client-cognito-identity-provider';
+import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
+
+const manifestPath = resolve('scripts/cleanup-manifest.json');
+const absent = (error: unknown) => ['ResourceNotFoundException', 'UserPoolDomainNotFoundException', 'InvalidParameterException'].includes((error as { name?: string }).name || '');
+async function tolerate(label: string, action: () => Promise<unknown>) { try { await action(); console.log(`removed: ${label}`); } catch (error) { if (absent(error)) console.log(`already absent: ${label}`); else throw error; } }
+async function main() {
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  if (manifest.ownership !== 'aws-classify-docs-20261018-k8r3' || manifest.region !== 'us-east-1') throw new Error('Refusing manifest with unexpected ownership/region');
+  const account = (await new STSClient({ region: manifest.region }).send(new GetCallerIdentityCommand({}))).Account;
+  if (account !== manifest.accountId) throw new Error('Refusing cleanup in a different AWS account');
+  const client = new CognitoIdentityProviderClient({ region: manifest.region });
+  await tolerate(`domain ${manifest.domain}`, () => client.send(new DeleteUserPoolDomainCommand({ UserPoolId: manifest.userPoolId, Domain: manifest.domain })));
+  for (const username of manifest.users || []) await tolerate(`user ${username}`, () => client.send(new DeleteUserCommand({ UserPoolId: manifest.userPoolId, Username: username })));
+  await tolerate(`app client ${manifest.clientId}`, () => client.send(new DeleteUserPoolClientCommand({ UserPoolId: manifest.userPoolId, ClientId: manifest.clientId })));
+  await tolerate(`resource server ${manifest.resourceServerIdentifier}`, () => client.send(new DeleteResourceServerCommand({ UserPoolId: manifest.userPoolId, Identifier: manifest.resourceServerIdentifier })));
+  await tolerate(`user pool ${manifest.userPoolId}`, () => client.send(new DeleteUserPoolCommand({ UserPoolId: manifest.userPoolId })));
+  try { await client.send(new DescribeUserPoolCommand({ UserPoolId: manifest.userPoolId })); throw new Error('User pool remains after cleanup'); } catch (error) { if (!absent(error)) throw error; }
+  await rm(manifestPath, { force: true }); await rm(resolve('scripts/provider.env'), { force: true }); await rm(resolve('scripts/test-passwords.local.json'), { force: true });
+  console.log('verified absent; removed local manifest and local passwords');
+}
+void main();

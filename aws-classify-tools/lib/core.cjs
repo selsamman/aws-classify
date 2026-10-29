@@ -54,6 +54,13 @@ function stackName(service, stage) {
     if (!service.service) throw new Error('The resolved Serverless configuration has no service name.');
     return `${service.service}-${stage}`;
 }
+function stackOutputValues(stack, name) {
+    if (!stack) throw new Error(`CloudFormation stack was not found: ${name}`);
+    if (stack.StackStatus?.endsWith('_IN_PROGRESS')) {
+        throw new Error(`CloudFormation stack ${name} is ${stack.StackStatus}. Wait for the current stack operation to finish before publishing or removing it.`);
+    }
+    return Object.fromEntries((stack.Outputs || []).map(item => [item.OutputKey, item.OutputValue]));
+}
 async function stackOutputs({config, stage, region}) {
     const resolved = await resolvedConfig(config, stage, {AWS_CLASSIFY_ACCOUNT_ID: process.env.AWS_CLASSIFY_ACCOUNT_ID || 'pending'});
     region ||= resolved.config.provider?.region;
@@ -64,8 +71,7 @@ async function stackOutputs({config, stage, region}) {
     const client = new CloudFormationClient({region});
     const {Stacks} = await client.send(new DescribeStacksCommand({StackName: name}));
     const stack = Stacks?.[0];
-    if (!stack) throw new Error(`CloudFormation stack was not found: ${name}`);
-    return {name, region, outputs: Object.fromEntries((stack.Outputs || []).map(item => [item.OutputKey, item.OutputValue])), resolved: deployed};
+    return {name, region, outputs: stackOutputValues(stack, name), resolved: deployed};
 }
 async function deployedAccountId(region) {
     if (process.env.AWS_CLASSIFY_ACCOUNT_ID) return process.env.AWS_CLASSIFY_ACCOUNT_ID;
@@ -224,4 +230,4 @@ async function runExpo({project, cloudOutput, localApi, expoArgs}) {
     return new Promise((resolveExit, reject) => child.once('error', reject).once('exit', code => code === 0 ? resolveExit() : reject(new Error(`Expo exited (${code}).`))));
 }
 
-module.exports = {emptyBucket, initializeLocalDb, localDynamoEndpoint, publishFromStack, publishSite, resolvedConfig, runExpo, runOffline, runServerless, stackName, stackOutputs, writeStackOutputs};
+module.exports = {emptyBucket, initializeLocalDb, localDynamoEndpoint, publishFromStack, publishSite, resolvedConfig, runExpo, runOffline, runServerless, stackName, stackOutputs, stackOutputValues, writeStackOutputs};

@@ -120,7 +120,13 @@ uploads the frontend to `ContentBucket`, deletes stale files, and invalidates th
 reported `CloudFrontId`. The service name, stack name, bucket, and distribution
 are therefore not duplicated in `package.json`.
 
-To update only the frontend after deploying the stack, build it and publish:
+Wait for the deployment command to exit successfully, including its publication
+step, before starting another deploy, publish or remove command for that stage.
+A CloudFront hostname or partially created API is not proof that the stack has
+finished: CloudFormation outputs can be absent during creation. If a command
+reports an in-progress stack operation, wait for completion before retrying.
+
+To update only the frontend after the completed deployment, build it and publish:
 
 ```bash
 npm run build --workspace web

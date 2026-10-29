@@ -260,3 +260,13 @@ client bundle, and passed all 46 legacy cases through Gateway and default
 CloudFront. All four owned deployments, including failed attempts, were cleaned;
 no recorded owned Lambda log groups remained. Reports and provider/lifecycle
 limits are recorded in feature-request section 15. Okta remains untested.
+
+## Independent guide-adoption exercise
+
+See [the manual-adoption review](manual-adoption/2026-10-20-review.md) for the first
+published-package/browser smoke run and its limits. Its reference app is outside
+the root workspaces and is not part of `npm test`. The full guide-adoption matrix
+remains incomplete; do not substitute the partial screen for the existing AWS
+acceptance suites. The user closed this documentation exercise on 2026-10-23;
+its remaining exploratory cases and future fixture promotion are not release gates.
+See [the closeout decision](manual-adoption/README.md#exercise-closed--2026-10-23).

@@ -68,7 +68,10 @@ first deployment and uses a normal push that preserves deployment history and
 refuses to overwrite a concurrent publication. On the first publication, configure
 repository **Settings → Pages → Deploy from a branch**, select `gh-pages` and
 the root directory. Then verify the public homepage and a nested documentation
-link after GitHub finishes its deployment.
+link after GitHub finishes its deployment. Publishing npm packages does not
+publish this guide. Before a guide-adoption exercise, verify that the public
+pages and downloadable YAML contain the intended changes; record the guide
+source revision and the actual published pages used by the test.
 
 Use a Git credential helper or SSH configuration; do not put credentials into
 the guide, URLs or repository files. No AWS deployment workflow is needed for

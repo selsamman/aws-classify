@@ -116,6 +116,35 @@ The issuer's discovery, token and JWKS endpoints must allow the browser requests
 You can supply explicit metadata when discovery is unavailable. See the
 [client reference](../reference/client.md) for managed options.
 
+## Cognito setup order
+
+Provider creation is separate from aws-classify deployment. You can use the
+Cognito console or your own AWS provisioning scripts. For a new Cognito provider:
+
+1. Create a user pool, an API resource server with the scopes you need, a public
+   app client without a secret, and a hosted login domain. Enable authorization
+   code flow and allow `openid` plus your API scopes on that client. Choose a
+   domain prefix accepted by Cognito; prefixes containing reserved terms such as
+   `aws` are rejected. A service name is not necessarily a valid login-domain prefix.
+2. Configure an initial registered callback/logout URL when enabling the code
+   flow. If the CloudFront URL is not known yet, use a temporary HTTPS URL you
+   will replace before login testing. Obtain the pool's issuer and app-client ID
+   for `OIDC_ISSUER_URL` and `OIDC_AUDIENCE` in the backend YAML.
+3. Deploy the authenticated backend and website resources, and wait for that
+   command to finish. Register the resulting site's exact root URL as the
+   Cognito callback/logout URL, replacing any temporary value.
+4. Set the browser's managed-client issuer, client ID, redirect URI and API
+   scopes to match, then build and publish the frontend. Verify the code/PKCE
+   browser login and callback before testing protected requests.
+
+For disposable test users, choose usernames compatible with the pool's sign-in
+settings; a pool configured for email usernames will reject arbitrary test names.
+Delete separately provisioned provider resources separately when removing a test
+application. Removing the aws-classify service does not remove an external pool.
+
+See AWS's [app-client configuration](https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_CreateUserPoolClient.html)
+and [domain configuration](https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_CreateUserPoolDomain.html).
+
 ## Create a managed client
 
 Use separate tab-scoped storage for the protected application-session ID:

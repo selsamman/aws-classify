@@ -1,0 +1,28 @@
+{
+  "name": "aws-classify-docs-20261018-k8r3",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "cloud",
+    "web",
+    "common/requests"
+  ],
+  "scripts": {
+    "cloud:offline": "aws-classify cloud offline --config cloud/serverless.yml --web web",
+    "cloud:offline:backend": "aws-classify cloud offline --config cloud/serverless.yml --backend-only",
+    "cloud:db:init": "aws-classify cloud db:init --config cloud/serverless.yml",
+    "build": "npm run build --workspace web && npm run check --workspace cloud",
+    "cloud:deploy:acceptance": "npm run build --workspace web && aws-classify cloud deploy --config cloud/serverless.yml --stage acceptance --region us-east-1 --publish --source web/dist",
+    "cloud:publish:acceptance": "npm run build --workspace web && aws-classify cloud publish --config cloud/serverless.yml --stage acceptance --region us-east-1 --source web/dist",
+    "cloud:remove:acceptance": "aws-classify cloud remove --config cloud/serverless.yml --stage acceptance --region us-east-1"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-cloudformation": "^3.1153.0",
+    "@aws-sdk/client-cloudfront": "^3.1153.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.1153.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1153.0",
+    "@aws-sdk/client-sts": "^3.1153.0",
+    "aws-classify-tools": "^0.2.3",
+    "tsx": "^4.20.6"
+  }
+}

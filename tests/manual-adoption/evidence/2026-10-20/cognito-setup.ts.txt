@@ -1,0 +1,57 @@
+/**
+ * Disposable Cognito bootstrap. AWS SDK reference: https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/
+ * Writes IDs only to cleanup-manifest.json; test passwords go only to an ignored local file.
+ */
+import { randomBytes } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import {
+  AdminCreateUserCommand, AdminSetUserPasswordCommand, CognitoIdentityProviderClient,
+  CreateResourceServerCommand, CreateUserPoolClientCommand, CreateUserPoolDomainCommand,
+  CreateUserPoolCommand, DescribeResourceServerCommand, ListUserPoolClientsCommand, ListUserPoolsCommand,
+} from '@aws-sdk/client-cognito-identity-provider';
+import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
+
+const region = 'us-east-1';
+const namespace = 'aws-classify-docs-20261018-k8r3';
+const dir = resolve('scripts');
+const manifestPath = resolve(dir, 'cleanup-manifest.json');
+const passwordPath = resolve(dir, 'test-passwords.local.json');
+const password = () => `Aa1!${randomBytes(18).toString('base64url')}`;
+
+async function main() {
+  await mkdir(dir, { recursive: true });
+  const sts = new STSClient({ region });
+  const accountId = (await sts.send(new GetCallerIdentityCommand({}))).Account;
+  if (!accountId) throw new Error('AWS caller identity did not return an account ID');
+  const cognito = new CognitoIdentityProviderClient({ region });
+  const existing = (await cognito.send(new ListUserPoolsCommand({ MaxResults: 60 }))).UserPools?.find(pool => pool.Name === `${namespace}-users`);
+  const pool = existing ? { UserPool: existing } : await cognito.send(new CreateUserPoolCommand({ PoolName: `${namespace}-users`, AliasAttributes: ['email'], AutoVerifiedAttributes: [], Policies: { PasswordPolicy: { MinimumLength: 12, RequireLowercase: true, RequireNumbers: true, RequireSymbols: true, RequireUppercase: true } } }));
+  const userPoolId = pool.UserPool?.Id;
+  if (!userPoolId) throw new Error('CreateUserPool returned no pool ID');
+  const apiIdentifier = `${namespace}-api`;
+  try { await cognito.send(new DescribeResourceServerCommand({ UserPoolId: userPoolId, Identifier: apiIdentifier })); }
+  catch (error) { if ((error as { name?: string }).name !== 'ResourceNotFoundException') throw error; await cognito.send(new CreateResourceServerCommand({ UserPoolId: userPoolId, Identifier: apiIdentifier, Name: `${namespace} API`, Scopes: [{ ScopeName: 'invoke', ScopeDescription: 'Invoke diagnostic API' }] })); }
+  // Cognito requires a callback at code-flow client creation. It is replaced with CloudFront's actual URL before browser testing.
+  const placeholderCallback = 'https://example.invalid/';
+  const existingClient = (await cognito.send(new ListUserPoolClientsCommand({ UserPoolId: userPoolId, MaxResults: 60 }))).UserPoolClients?.find(client => client.ClientName === `${namespace}-browser`);
+  const client = existingClient ? { UserPoolClient: existingClient } : await cognito.send(new CreateUserPoolClientCommand({ UserPoolId: userPoolId, ClientName: `${namespace}-browser`, GenerateSecret: false, AllowedOAuthFlowsUserPoolClient: true, AllowedOAuthFlows: ['code'], AllowedOAuthScopes: ['openid', 'profile', `${apiIdentifier}/invoke`], SupportedIdentityProviders: ['COGNITO'], CallbackURLs: [placeholderCallback], LogoutURLs: [placeholderCallback], ExplicitAuthFlows: ['ALLOW_REFRESH_TOKEN_AUTH', 'ALLOW_USER_SRP_AUTH', 'ALLOW_USER_PASSWORD_AUTH'], PreventUserExistenceErrors: 'ENABLED' }));
+  const clientId = client.UserPoolClient?.ClientId;
+  if (!clientId) throw new Error('CreateUserPoolClient returned no client ID');
+  // Cognito reserves “aws” in hosted-UI prefixes; this disposable alias preserves the run ID.
+  const domain = 'acd-20261018-k8r3-login';
+  // Persist exact created IDs before operations that can fail, so cleanup works after an interrupted setup.
+  const manifest = { schemaVersion: 1, ownership: namespace, createdAt: new Date().toISOString(), region, accountId, userPoolId, clientId, domain, resourceServerIdentifier: apiIdentifier, users: ['docs-user-a', 'docs-user-b'] };
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
+  await cognito.send(new CreateUserPoolDomainCommand({ UserPoolId: userPoolId, Domain: domain }));
+  const passwords: Record<string, string> = {};
+  for (const username of ['docs-user-a', 'docs-user-b']) {
+    const value = password(); passwords[username] = value;
+    await cognito.send(new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: username, UserAttributes: [{ Name: 'email', Value: `${username}@example.invalid` }, { Name: 'email_verified', Value: 'true' }], MessageAction: 'SUPPRESS', TemporaryPassword: value }));
+    await cognito.send(new AdminSetUserPasswordCommand({ UserPoolId: userPoolId, Username: username, Password: value, Permanent: true }));
+  }
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
+  await writeFile(passwordPath, JSON.stringify(passwords, null, 2) + '\n', { mode: 0o600 });
+  console.log(JSON.stringify({ manifestPath, provider: { issuer: `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`, audience: clientId, domain: `https://${domain}.auth.${region}.amazoncognito.com`, scope: `${apiIdentifier}/invoke` } }, null, 2));
+}
+void main();

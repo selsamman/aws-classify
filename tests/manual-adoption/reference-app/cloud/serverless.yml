@@ -1,0 +1,54 @@
+service: ${env:MANUAL_ADOPTION_SERVICE}
+frameworkVersion: '4'
+custom:
+  awsClassify:
+    authorizer:
+      name: applicationJwt
+      scopes:
+        - ${env:OIDC_SCOPE}
+  directories:
+    responseHandlers: src/responses/index
+    includeFiles: ../node_modules/aws-classify-server/yml
+  yml: ${self:custom.directories.includeFiles}
+  stage: ${opt:stage, 'acceptance'}
+  domainName: ${self:service}-${self:custom.stage}
+  # Local-development page says the tools provide a local account suffix; this keeps auth config runnable offline.
+  bucketName: ${self:service}-${self:custom.stage}-${env:AWS_CLASSIFY_ACCOUNT_ID, 'local'}
+  serverless-offline:
+    host: 127.0.0.1
+    httpPort: 4000
+    websocketPort: 3001
+    lambdaPort: 3002
+    useInProcess: true
+    localEnvironment: true
+plugins:
+  - serverless-offline
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: ${opt:region, 'us-east-1'}
+  httpApi:
+    authorizers:
+      applicationJwt:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: ${env:OIDC_ISSUER_URL}
+        audience:
+          - ${env:OIDC_AUDIENCE}
+  websocketsApiRouteSelectionExpression: $request.body.action
+  logs:
+    websocket:
+      fullExecutionData: false
+  environment:
+    APIG_ENDPOINT: ${file(${self:custom.yml}/apig.yml)}
+    DOMAIN: ${self:custom.domainName}
+    DD_REGION: ${self:provider.region}
+  iam:
+    role:
+      statements:
+        - ${file(${self:custom.yml}/provider-iam.yml)}
+functions:
+  - ${file(${self:custom.yml}/functions-authenticated.yml)}
+resources:
+  - ${file(${self:custom.yml}/resources-website-authenticated.yml)}
+  - ${file(${self:custom.yml}/resources-dynamodb.yml)}

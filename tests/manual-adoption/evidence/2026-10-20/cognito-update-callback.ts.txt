@@ -1,0 +1,21 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { CognitoIdentityProviderClient, UpdateUserPoolClientCommand } from '@aws-sdk/client-cognito-identity-provider';
+import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
+
+const manifestPath = resolve('scripts/cleanup-manifest.json');
+async function main() {
+  const rootUrl = process.argv[2];
+  if (!rootUrl || !/^https:\/\//.test(rootUrl)) throw new Error('Usage: npm run cognito:callback -- https://CLOUDFRONT-DOMAIN/');
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  const region = manifest.region;
+  const account = (await new STSClient({ region }).send(new GetCallerIdentityCommand({}))).Account;
+  if (account !== manifest.accountId || manifest.ownership !== 'aws-classify-docs-20261018-k8r3') throw new Error('Manifest ownership/account verification failed');
+  const callback = new URL(rootUrl).origin + '/';
+  await new CognitoIdentityProviderClient({ region }).send(new UpdateUserPoolClientCommand({ UserPoolId: manifest.userPoolId, ClientId: manifest.clientId, AllowedOAuthFlowsUserPoolClient: true, AllowedOAuthFlows: ['code'], AllowedOAuthScopes: ['openid', 'profile', `${manifest.resourceServerIdentifier}/invoke`], SupportedIdentityProviders: ['COGNITO'], CallbackURLs: [callback], LogoutURLs: [callback] }));
+  manifest.callbackUrl = callback;
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n', { mode: 0o600 });
+  await writeFile(resolve('scripts/provider.env'), `OIDC_ISSUER_URL=https://cognito-idp.${region}.amazonaws.com/${manifest.userPoolId}\nOIDC_AUDIENCE=${manifest.clientId}\nVITE_OIDC_ISSUER=https://cognito-idp.${region}.amazonaws.com/${manifest.userPoolId}\nVITE_OIDC_CLIENT_ID=${manifest.clientId}\nVITE_OIDC_REDIRECT_URI=${callback}\nVITE_OIDC_SCOPE=${manifest.resourceServerIdentifier}/invoke\n`, { mode: 0o600 });
+  console.log(`Registered ${callback}; source scripts/provider.env before deploy/publish.`);
+}
+void main();
