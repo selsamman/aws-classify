@@ -12,7 +12,7 @@ custom:
   yml: ${self:custom.directories.includeFiles}
   stage: ${opt:stage, 'dev'}
   domainName: ${self:service}-${self:custom.stage}
-  bucketName: ${self:service}-${self:custom.stage}-${aws:accountId}
+  bucketName: ${self:service}-${self:custom.stage}-${env:AWS_CLASSIFY_ACCOUNT_ID, 'local'}
   serverless-offline:
     host: 127.0.0.1
     httpPort: 4000
