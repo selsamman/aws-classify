@@ -94,6 +94,9 @@ is protected unless its shared request-class method has `@Public()`. Public
 dispatch accepts only those marked methods; a payload flag cannot change which
 entry point invokes a method. Plain JavaScript applications can use the matching
 `publicMethods` lists at server registration and client construction instead.
+See [public and protected members](../reference/contracts.md#public-and-protected-members)
+for the decorator import, TypeScript compiler setting and migration from older
+suffix-based configuration. Method names alone never grant public access.
 
 The authenticated CloudFront template forwards Authorization, disables API
 caching and preserves authentication errors. The legacy static-hosting template

@@ -79,22 +79,114 @@ when a recipient is disconnected. The framework does not provide a delivery queu
 
 ## Notify from background work
 
-An IAM-authorized Lambda or job can send to a trusted application session ID:
+A Step Functions task, scheduled Lambda or other IAM-authorized background job can
+send to a trusted application session ID. It does not need an HTTP or WebSocket
+event. Step Functions invokes the Lambda directly; the notification helper then
+uses API Gateway's IAM-authorized WebSocket management API to reach the browser.
 
-```ts
-const notification = await classifyServerless.createRequestForSession(
-    trustedSessionId,
-    CounterClientRequest,
-);
-await notification.countChanged(42);
+### Add a producer to the same Serverless service
+
+Keep the authenticated configuration from [browser login](authentication.md),
+including its provider environment, IAM include and session-table resource. Add
+this entry alongside the framework functions in the existing `functions` list:
+
+```yaml
+functions:
+  - ${file(${self:custom.yml}/functions-authenticated.yml)}
+  - backgroundNotify:
+      handler: src/notifications.handler
+      environment:
+        AWS_CLASSIFY_AUTHENTICATION: 'true'
 ```
 
-Register the client request in that producer process too. In authenticated mode,
-configure its framework authentication mode and session-table/socket environment
-consistently with the dispatch service, so it applies owned-session checks.
-It needs DynamoDB access and `execute-api:ManageConnections` for the WebSocket
-API. It does not need to retain a browser access token or fabricate a user
-identity. Your application decides which recipients a producer may target.
+The producer inherits `DOMAIN`, `APIG_ENDPOINT` and `DD_REGION` from
+`provider.environment`. These identify the same session table, WebSocket API/stage
+and region as the dispatch service. The authentication flag must be set explicitly:
+`functions-authenticated.yml` sets it on the framework handlers, not on unrelated
+application functions. Do not set `IS_OFFLINE` on deployed functions.
+
+```ts title="cloud/src/notifications.ts"
+import {classifyServerless} from 'aws-classify-server';
+import {CounterClientRequest} from '@my-app/requests';
+
+// Registration is required in this Lambda process too.
+classifyServerless.registerRequest(CounterClientRequest);
+
+export async function handler(event: {sessionId: string; count: number}): Promise<void> {
+    const notification = await classifyServerless.createRequestForSession(
+        event.sessionId,
+        CounterClientRequest,
+    );
+    await notification.countChanged(event.count);
+}
+```
+
+Get the session ID server-side with `classifyServerless.getSessionId(this)` in the
+authorized application method that starts the job. Preserve it in the workflow
+input and invoke this handler with `{sessionId, count}`. Your application must
+authorize the job and its recipient; do not let a caller choose an arbitrary
+notification session. No browser access token, fabricated user identity, public
+HTTP endpoint or Lambda resource-policy grant to API Gateway is needed for this
+producer. The workflow's execution role needs `lambda:InvokeFunction` on this
+Lambda; that is separate from the Lambda's own execution permissions.
+
+### Understand the inherited permissions
+
+`resources-dynamodb.yml` creates the table; it does not make it publicly readable
+or writable. AWS checks IAM permissions for table operations.
+`provider-iam.yml` grants the framework's DynamoDB operations only on
+`AWSClassifySessionTable` and its indexes. In the default shared-role setup, an
+application Lambda in the same service inherits those grants.
+
+Serverless Framework also adds `execute-api:ManageConnections` to the default
+service role when the service contains WebSocket events, as the framework's
+functions do. A producer using that same role therefore normally needs **no
+additional DynamoDB or WebSocket IAM statement**. The framework's authenticated
+AWS fixture uses this pattern in
+[`tests/server/serverless-auth.yml`](https://github.com/selsamman/aws-classify/blob/master/tests/server/serverless-auth.yml)
+with its `backgroundNotify` function. See
+[Serverless IAM behavior](https://www.serverless.com/framework/docs/providers/aws/guide/iam).
+
+### Use a separate role or service
+
+A custom execution role does not automatically inherit `provider-iam.yml` or the
+default role's WebSocket grants. A Lambda in another service also needs the
+original service's session namespace, table region and management endpoint.
+
+For the notification-only `createRequestForSession()` path above, add these
+statements to the producer's execution role, alongside its normal logging
+permissions. This example references resources in the same stack; for another
+stack, supply the original table ARN and WebSocket API ID/stage through your
+application's deployment configuration.
+
+```yaml
+- Effect: Allow
+  Action: dynamodb:GetItem
+  Resource: !GetAtt AWSClassifySessionTable.Arn
+- Effect: Allow
+  Action: execute-api:ManageConnections
+  Resource:
+    Fn::Sub: 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${WebsocketsApi}/${sls:stage}/POST/@connections/*'
+```
+
+`createRequestForSession()` and the authenticated send read the session and current
+connection; they do not update application session state. If the producer also
+uses `createResponse()` to restore and save state, or uses other session helpers,
+grant the additional DynamoDB operations those helpers need. The full framework
+IAM include is suitable for the standard shared role.
+
+The SDK signs notification requests with the Lambda execution-role credentials.
+This IAM permission is distinct from the browser's token and socket credential.
+See [AWS WebSocket management authorization](https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-websocket-control-access-iam.html).
+
+### Handle completion independently of delivery
+
+Persist the authoritative job result before attempting the notification. Missing
+or expired sessions, disconnected clients and transport failures reject the send.
+Decide whether to record the failure, retry or queue a message in application
+code; a notification failure should not turn a successfully encoded artifact into
+an encoding failure. The framework does not queue or replay notifications, and a
+successful send is not an acknowledgment that the browser processed it.
 
 ## Reconnect and resume
 

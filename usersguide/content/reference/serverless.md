@@ -69,8 +69,11 @@ functions include does not automatically configure unrelated producer Lambdas.
 
 ## Permissions
 
-The supplied DynamoDB IAM include grants its listed operations on `"*"`. In a
-service with the supplied table, you can scope an application-owned statement:
+`resources-dynamodb.yml` creates the session table, without granting public access.
+The supplied `provider-iam.yml` grants its listed operations only on
+`AWSClassifySessionTable` and its indexes. Include it in
+`provider.iam.role.statements` to give the default service execution role the
+framework permissions. Its statement is equivalent to:
 
 ```yaml
 provider:
@@ -90,9 +93,18 @@ provider:
             - !Join ['', [!GetAtt AWSClassifySessionTable.Arn, '/index/*']]
 ```
 
-Keep `execute-api:ManageConnections` permission for notification senders.
-Serverless configures the WebSocket service permissions in the stock setup;
-an independent producer role needs its own access to the relevant API/stage.
+Serverless Framework automatically adds `execute-api:ManageConnections` to the
+default service role when the service has WebSocket events. A background Lambda
+using that shared role inherits the DynamoDB include and WebSocket permission;
+it normally needs no extra IAM statements. A custom role or separate service
+must receive its own table and WebSocket management permissions. Table creation,
+API Gateway's permission to invoke a Lambda, and a producer's permission to send
+a notification are separate concerns.
+
+See [background notifications](../guides/notifications.md#notify-from-background-work)
+for a complete producer example, its environment settings, and a narrower
+notification-only policy. See also
+[Serverless IAM behavior](https://www.serverless.com/framework/docs/providers/aws/guide/iam).
 
 ## Development environment
 

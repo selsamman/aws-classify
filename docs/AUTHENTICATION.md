@@ -49,11 +49,14 @@ functions:
 
 The include enables authentication on all four framework functions through
 function environment variables. Its file resolver validates the authorizer
-reference, optional scopes, public suffix, and socket logging before packaging.
+reference, optional scopes, and socket logging before packaging.
 A missing or undefined named authorizer fails configuration resolution; there
-is no fallback to an open protected route. A suffix must match
-`^[A-Za-z][A-Za-z0-9_]*$`; it is required on both client and server. Execution
-tracing must stay disabled because handshake headers contain credentials.
+is no fallback to an open protected route. Public access is declared with
+`@Public()` on the shared request-class method, or explicit `publicMethods`
+lists for plain JavaScript. There is no public-suffix configuration or
+`AWS_CLASSIFY_PUBLIC_SUFFIX` environment variable; method names do not grant
+anonymous access. Execution tracing must stay disabled because handshake headers
+contain credentials.
 
 The two fixed HTTP entry points share dispatch code:
 
@@ -69,8 +72,12 @@ cannot change it. `$WebSocket.$authorize` is an internal protected operation.
 Public dispatch cannot invoke it. Mark a shared request-class method with
 `@Public()` to expose it anonymously; all other methods are protected by default.
 Plain JavaScript applications may instead pass the matching `publicMethods` list
-to `registerResponse()` and the client authentication options. Do not mix the
-two declaration styles for a response class.
+as the third argument to `registerResponse(ResponseClass, authorizationCallback,
+{publicMethods: ['getVersion']})` and in the client authentication options.
+Import `Public` from `aws-classify-common` and enable `experimentalDecorators`
+when compiling shared TypeScript request classes. Do not mix the two declaration
+styles for a response class. Public methods are rejected on protected dispatch,
+just as protected methods are rejected on public dispatch.
 
 API Gateway validates tokens. For JWT authorizers, the framework reads only
 `requestContext.authorizer.jwt.claims` and `.scopes`; it never decodes a client
@@ -252,6 +259,14 @@ and sends also require a current connection. They do
 not invent request identity for a background producer. Application permission
 to target another session remains application policy; do not expose unrestricted
 notification helpers as browser-callable members.
+
+For a complete producer handler and deployment settings, see the
+[background notification guide](../usersguide/content/guides/notifications.md#notify-from-background-work).
+A producer in the default shared service role inherits the session-table IAM
+include and Serverless-generated WebSocket send permission. A separate role or
+service must be granted those permissions explicitly. In either case, configure
+`AWS_CLASSIFY_AUTHENTICATION=true` and the matching session namespace, region and
+WebSocket management endpoint on the producer.
 
 ## Development, migration, and review
 

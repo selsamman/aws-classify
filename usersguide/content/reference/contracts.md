@@ -66,6 +66,13 @@ a public route cannot call a protected method, and the protected route cannot
 call a public method. Method-name suffixes have no effect.
 `$WebSocket.$authorize` is always protected.
 
+When migrating from an earlier suffix-based integration, replace
+`custom.awsClassify.publicSuffix` and client suffix options with those declarations.
+Do not set `AWS_CLASSIFY_PUBLIC_SUFFIX`. A method named `getVersionPublic()` stays
+protected unless explicitly marked public; the name alone no longer changes its
+route or permissions. Do not combine decorators and the fallback list for the
+same response class.
+
 TypeScript types are helpful to developers, but incoming data still crosses a
 network boundary. Validate it in server response methods and apply application
 permission checks from trusted context.

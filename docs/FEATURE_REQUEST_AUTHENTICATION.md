@@ -1,5 +1,14 @@
 # Feature request: OIDC authentication and test validation
 
+Current API note: the suffix-based public-member routing described in the
+original requirements and Stage 2 records below has been superseded by
+`@Public()` on shared request-class methods, or matching explicit `publicMethods`
+lists for plain JavaScript. No public-suffix configuration is required today.
+Those historical records are retained as implementation history; use
+[the authentication guide](AUTHENTICATION.md) and
+[the public contract reference](../usersguide/content/reference/contracts.md#public-and-protected-members)
+for the current contract.
+
 Status: Stage 2 HTTP integration and owned socket attachment implemented.
 All 46 deployed authentication acceptance cases passed directly and through
 default CloudFront; all resources owned by these validation runs were removed. The implementation and
