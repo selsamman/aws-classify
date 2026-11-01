@@ -49,11 +49,18 @@ included framework configuration files. Docusaurus fails on broken internal
 links. Download files are generated from the displayed YAML before development,
 building and publication; they are ignored rather than maintained twice.
 
-Publish with configured GitHub write credentials:
+Publish from an interactive terminal with Git Credential Manager (GCM) installed:
 
 ```sh
 npm run guide:publish
 ```
+
+The publisher uses GCM browser sign-in only for its push, with inherited helpers
+cleared and `credentialStore=none`. Credentials are not stored in Keychain or a
+cache, and normal Git configuration is unchanged. No manually managed personal
+access token is required. GitHub determines browser-session/MFA behavior. An
+unchanged build does not sign in or push. See the guide's repository chapter for
+installation and usage.
 
 The guide's repository chapter documents editing and publication. Keep source
 changes reviewable and commit them separately from generated-site publication.

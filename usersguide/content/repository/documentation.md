@@ -55,7 +55,7 @@ The project site is configured for `https://selsamman.github.io/aws-classify/`,
 with base path `/aws-classify/`. Publication builds Docusaurus and sends the
 generated site to `gh-pages`. It does not publish library packages to npm.
 
-With GitHub write access configured, run:
+From an interactive terminal, run:
 
 ```bash
 npm run guide:publish
@@ -73,10 +73,33 @@ publish this guide. Before a guide-adoption exercise, verify that the public
 pages and downloadable YAML contain the intended changes; record the guide
 source revision and the actual published pages used by the test.
 
-Use a Git credential helper or SSH configuration; do not put credentials into
-the guide, URLs or repository files. No AWS deployment workflow is needed for
-this site. If a Pages workflow is introduced later, keep it specific to the
-documentation build and explicitly configure that publication source.
+The publisher uses [Git Credential Manager (GCM)](https://github.com/git-ecosystem/git-credential-manager)
+for browser sign-in. Install GCM using its
+[installation instructions](https://github.com/git-ecosystem/git-credential-manager/blob/main/docs/install.md).
+It can be on `PATH` or at `~/.local/bin/git-credential-manager`. The standard macOS
+installer configures Git globally; a manually extracted release archive can be
+used without running `configure` when you want to retain existing Git/IDE settings.
+
+For a changed build, complete GitHub's browser sign-in and return to the terminal.
+No personal access token needs to be copied or managed. GitHub applies its normal
+browser-session and MFA rules and may reuse an existing signed-in browser session.
+
+The publisher enables GCM only for its push, clears inherited credential helpers,
+and selects `credentialStore=none` and browser authentication. It does not read or
+save credentials through Keychain or a credential cache, and changes no normal Git
+configuration. This provides a browser sign-in step for each publication without
+leaving a reusable local login. An unchanged build needs neither GCM nor sign-in.
+Run from a terminal, including an IDE terminal tab, rather than an unattended job
+or IDE run configuration. A cancelled login or failed push stops publication.
+
+GCM uses a GitHub OAuth authorization; the browser identifies it as Git Credential
+Manager. That authorization is not restricted to this repository. These settings
+provide a practical check against accidental publication, not repository isolation
+for other commands. See [GCM's no-storage mode](https://github.com/git-ecosystem/git-credential-manager/blob/main/docs/credstores.md#passthroughno-op-no-credential-store).
+
+No AWS deployment workflow is needed for this site. If a Pages workflow is
+introduced later, keep it specific to the documentation build and explicitly
+configure that publication source.
 
 See [Docusaurus deployment](https://docusaurus.io/docs/deployment) and
 [GitHub Pages publication sources](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
