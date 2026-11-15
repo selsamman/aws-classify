@@ -110,7 +110,11 @@ for (const [mode, message] of [
     test(`cleans up after ${mode}`, async () => {
         const settings = await options(mode);
         if (mode.includes('timeout') || mode === 'partial-start') settings.startupTimeoutMs = 1500;
-        await assert.rejects(startOffline(settings), message);
+        await assert.rejects(startOffline(settings), error => {
+            assert.ok(!(error instanceof AggregateError), error.message);
+            assert.match(error.message, message);
+            return true;
+        });
         await assertReleased(settings.ports);
     });
 }
@@ -118,7 +122,11 @@ for (const [mode, message] of [
 test('reports a missing executable and releases DynamoDB', async () => {
     const settings = await options('normal');
     settings.command = join(directory, 'missing');
-    await assert.rejects(startOffline(settings), /ENOENT/);
+    await assert.rejects(startOffline(settings), error => {
+        assert.ok(!(error instanceof AggregateError), error.message);
+        assert.match(error.message, /ENOENT/);
+        return true;
+    });
     await assertReleased(settings.ports);
 });
 
@@ -157,3 +165,24 @@ test('cleans up when the database process dies during startup', async () => {
     await assert.rejects(startOffline(settings), /Dynalite failed.*7[\s\S]*database broke/);
     await assertReleased(settings.ports);
 });
+
+
+test('retries transient macOS group-probe permission failures during shutdown',
+    { skip: process.platform !== 'darwin' }, async t => {
+        const settings = await options('normal');
+        const offline = await startOffline(settings);
+        const kill = process.kill;
+        let denied = 0;
+        const mock = t.mock.method(process, 'kill', function (pid, signal) {
+            if (pid < 0 && signal === 0 && denied < 2) {
+                denied++;
+                throw Object.assign(new Error('kill EPERM'), {code: 'EPERM'});
+            }
+            return kill.call(process, pid, signal);
+        });
+        try {
+            await offline.stop();
+            assert.equal(denied, 2);
+        } finally { mock.mock.restore(); }
+        await assertReleased(settings.ports);
+    });

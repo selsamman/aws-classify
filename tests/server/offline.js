@@ -33,25 +33,38 @@ function signalGroup(child, signal) {
         if (process.platform === 'win32') child.kill(signal);
         else process.kill(-child.pid, signal);
     } catch (error) {
-        if (error.code !== 'ESRCH') throw error;
+        if (error.code !== 'ESRCH') {
+            throw new Error(`Could not send ${signal} to ${child.label} (PID/process group ${child.pid}): ${error.code}: ${error.message}`, { cause: error });
+        }
     }
 }
 
-function groupAlive(child) {
+async function groupAlive(child) {
     if (!child.pid) return false;
     if (process.platform === 'win32') return child.exitCode === null && child.signalCode === null;
-    try { process.kill(-child.pid, 0); return true; }
-    catch (error) { if (error.code === 'ESRCH') return false; throw error; }
+    // Retry transient macOS probe permission failures during shutdown,
+    // but never interpret denied access as absence.
+    for (let attempt = 0; ; attempt++) {
+        try { process.kill(-child.pid, 0); return true; }
+        catch (error) {
+            if (error.code === 'ESRCH') return false;
+            if (process.platform === 'darwin' && error.code === 'EPERM' && attempt < 5) {
+                await delay(50);
+                continue;
+            }
+            throw new Error(`Could not probe ${child.label} (PID/process group ${child.pid}, signal 0): ${error.code}: ${error.message}`, { cause: error });
+        }
+    }
 }
 
 async function stopChild(child, timeoutMs) {
     signalGroup(child, 'SIGTERM');
     const deadline = Date.now() + timeoutMs;
-    while (groupAlive(child) && Date.now() < deadline) await delay(50);
-    if (groupAlive(child)) signalGroup(child, 'SIGKILL');
+    while ((await groupAlive(child)) && Date.now() < deadline) await delay(50);
+    if (await groupAlive(child)) signalGroup(child, 'SIGKILL');
     const forcedDeadline = Date.now() + 2000;
-    while (groupAlive(child) && Date.now() < forcedDeadline) await delay(50);
-    if (groupAlive(child)) throw new Error(`Could not stop the process group for ${child.label}`);
+    while ((await groupAlive(child)) && Date.now() < forcedDeadline) await delay(50);
+    if (await groupAlive(child)) throw new Error(`Could not stop the process group for ${child.label}`);
     // Wait for the process and its output streams to close, not kill()'s boolean result.
     let timer;
     try {
@@ -166,7 +179,7 @@ async function startOffline(options = {}) {
         }
         check(config, true);
         // The completed command owns no live group; do not retain its old PID.
-        if (!groupAlive(config)) children.splice(children.indexOf(config), 1);
+        if (!(await groupAlive(config))) children.splice(children.indexOf(config), 1);
         const { TableName, BillingMode, AttributeDefinitions, KeySchema, GlobalSecondaryIndexes } = JSON.parse(config.stdoutText);
         if (!TableName || !KeySchema?.length) throw new Error('The resolved session table is missing its name or key schema');
         dbClient = new DynamoDBClient({
@@ -193,7 +206,10 @@ async function startOffline(options = {}) {
         return { stop, api: `http://${host}:${ports.http}/api/dispatch` };
     } catch (error) {
         try { await stop(); }
-        catch (cleanupError) { throw new AggregateError([error, cleanupError], 'Offline startup and cleanup failed'); }
+        catch (cleanupError) {
+            throw new AggregateError([error, cleanupError],
+                `Offline startup and cleanup failed: ${error.message}; ${cleanupError.message}`);
+        }
         throw error;
     }
 }
