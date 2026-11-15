@@ -17,7 +17,7 @@ Chained steps stop at the first failure.
 | `install:tests` | Runs `npm ci --ignore-scripts`, then `npm rebuild serverless`, then the root build. Recreates the installed dependencies from the lockfile, skips general install lifecycle hooks, and explicitly prepares the Serverless executable and libraries. Requires registry access when dependencies are not cached. |
 | `build` | Builds `aws-classify-common`, then client, then server. Each produces ESM, CommonJS, and TypeScript declarations under its `lib/` directory. |
 | `typecheck` | Runs the root build, then typechecks the requests, server, and client test workspaces. The server check also checks its browser TypeScript configuration. It is not a guide typecheck. |
-| `audit` | Runs `npm audit` against the root dependency tree. Requires registry access and can fail on reported vulnerabilities. |
+| `audit` | Runs `npm audit --omit=dev --audit-level=high` against the root workspace. Includes production dependencies of published tools as well as libraries; excludes development-only dependencies. Reports lower severities but blocks on high/critical findings. Requires registry access. For the full maintainer report, run `npm audit` directly. |
 
 ### Tests
 

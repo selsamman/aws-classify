@@ -21,7 +21,7 @@
     "@types/node": "^18.8.3",
     "@typescript-eslint/eslint-plugin": "^8.71.0",
     "@typescript-eslint/parser": "^8.71.0",
-    "axios": "^1.20.0",
+    "axios": "^1.21.1",
     "eslint": "^8.57.1",
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
@@ -31,6 +31,6 @@
   },
   "dependencies": {
     "@aws-classify-tests/requests": "0.1.0",
-    "aws-classify-client": "0.2.3"
+    "aws-classify-client": "0.2.4"
   }
 }

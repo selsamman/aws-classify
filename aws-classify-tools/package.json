@@ -1,6 +1,6 @@
 {
   "name": "aws-classify-tools",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Development and deployment commands for aws-classify applications",
   "main": "./lib/cli.cjs",
   "license": "MIT",
@@ -28,7 +28,7 @@
     "@aws-sdk/client-sts": "^3.1146.0",
     "dynalite": "^4.0.0",
     "mime-types": "^3.0.0",
-    "serverless": "^4.43.0",
+    "serverless": "^4.46.0",
     "serverless-offline": "^14.8.2"
   },
   "engines": {

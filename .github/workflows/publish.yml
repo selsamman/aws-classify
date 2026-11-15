@@ -68,7 +68,7 @@ jobs:
       - name: Check packed consumers
         run: npm run test:packed
 
-      - name: Audit framework dependencies
+      - name: Audit production dependencies (block high and critical)
         run: npm run audit
 
       - name: Publish all aws-classify packages as one release

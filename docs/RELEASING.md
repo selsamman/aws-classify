@@ -56,6 +56,12 @@ for example `v0.2.0`. GitHub prerelease status must agree with semver: prereleas
 target `next`, stable versions target `latest`. Release names need not be semver;
 the **tag** must be `v<package-version>`.
 
+The release audit uses `npm audit --omit=dev --audit-level=high`. It includes
+production dependencies of the libraries and published tools, excludes development-only
+dependencies, and blocks publication on high/critical findings. Lower severities are
+still reported. Run `npm audit` separately for the full maintainer dependency report.
+This is a workspace audit, not an isolated audit of each published tarball.
+
 ## Publication and failure behavior
 
 - Builds, typechecks, regression tests, release failure/recovery tests, packed
