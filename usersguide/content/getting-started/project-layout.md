@@ -49,8 +49,17 @@ no source synchronization or package publication is needed.
 }
 ```
 
-Add `"mobile"` when that directory exists. Start with your preferred web or Expo
-application tooling; aws-classify does not prescribe a UI framework.
+Add `"mobile"` when that directory exists. For a new React/TypeScript web client,
+create `web` before installing the workspace dependencies:
+
+```bash
+npm create vite@latest web -- --template react-ts
+npm install
+```
+
+Run these from the repository root; keep the generated `web/package.json` and
+Vite/TypeScript configuration. See [create the web client](web-client.md) for
+ports, API proxying, building and publication. You can use other frontend tools.
 
 ## Create the shared package
 
@@ -103,4 +112,4 @@ Use Node.js 20.19 or later for `aws-classify-tools`, or a newer release required
 by your selected frontend/backend tools. The chat example's mobile toolchain
 has its own requirements, documented in that example.
 
-You are ready to [make your first call](first-call.md).
+Continue with [the web client](web-client.md), then [make your first call](first-call.md).

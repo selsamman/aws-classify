@@ -45,7 +45,7 @@ function captureRevision(root, directory, label) {
     return {commit: git(['rev-parse', 'HEAD']).trim(), workingTree: git(['status', '--short']).trim(), diffSha256: createHash('sha256').update(diff).digest('hex'), sourceSha256: hashes};
 }
 
-function prepareFixture(reportDir) {
+function prepareFixture(reportDir, staticPages = false) {
     const root = resolve(__dirname, '../..');
     const fixture = join(reportDir, 'fixture');
     mkdirSync(fixture, {recursive:true});
@@ -60,17 +60,19 @@ function prepareFixture(reportDir) {
         writeFileSync(join(fixture, `fixture-${file}`), functions);
     }
     for (const file of ['serverless.yml', 'serverless-auth.yml']) {
-        const config = readFileSync(join(__dirname, file), 'utf8').replace('../../aws-classify-server/yml', join(root, 'aws-classify-server/yml')).replace('${self:custom.yml}/functions.yml','fixture-functions.yml').replace('${self:custom.yml}/functions-authenticated.yml','fixture-functions-authenticated.yml');
+        let config = readFileSync(join(__dirname, file), 'utf8').replace('../../aws-classify-server/yml', join(root, 'aws-classify-server/yml')).replace('${self:custom.yml}/functions.yml','fixture-functions.yml').replace('${self:custom.yml}/functions-authenticated.yml','fixture-functions-authenticated.yml');
+        if (staticPages) config = config.replace(/(  - \$\{file\(\$\{self:custom.yml\}\/resources-website[^\n]+\n)/, '$1  - ${file(${self:custom.yml}/resources-static-pages.yml)}\n');
         writeFileSync(join(fixture, file), config);
     }
     for (const file of ['package.json', 'tsconfig.json', 'auth-resources.yml']) copyFileSync(join(__dirname, file), join(fixture, file));
     symlinkSync(join(root, 'node_modules'), join(fixture, 'node_modules'), 'dir');
+    if (staticPages) writeFileSync(join(reportDir, 'package.json'), JSON.stringify({private: true, awsClassify: {spaDirectory: 'app'}}));
     return fixture;
 }
 
 async function main() {
     const {values} = parseArgs({options: {
-        auth: {type: 'boolean'}, suffix: {type: 'string'}, region: {type: 'string'}, profile: {type: 'string'}, cleanup: {type: 'string'},
+        auth: {type: 'boolean'}, suffix: {type: 'string'}, region: {type: 'string'}, profile: {type: 'string'}, cleanup: {type: 'string'}, 'static-pages': {type: 'string'},
     }});
     if (values.profile) process.env.AWS_PROFILE = values.profile;
     const prior = values.cleanup && JSON.parse(readFileSync(resolve(values.cleanup), 'utf8'));
@@ -210,7 +212,12 @@ async function main() {
             controller.signal.throwIfAborted();
             await s3.send(new CreateBucketCommand({Bucket: report.deploymentBucket, ...(region === 'us-east-1' ? {} : {CreateBucketConfiguration: {LocationConstraint: region}})}));
             report.deploymentBucketOwned = true; save();
-            const fixtureDir = prepareFixture(reportDir);
+            const fixtureDir = prepareFixture(reportDir, !!values['static-pages']);
+            // Persist the isolated names so the publisher's own Serverless print
+            // resolves exactly the stack that was packaged and deployed.
+            if (values['static-pages']) for (const file of ['serverless.yml', 'serverless-auth.yml'])
+                appendFileSync(join(fixtureDir, file), '\nparams: ' + JSON.stringify({default: {suffix, contentBucket: report.contentBucket, deploymentBucket: report.deploymentBucket,
+                    authDomain: `classify-fixture-${createHash('sha256').update(service).digest('hex').slice(0,24)}`}}) + '\n');
             const binary = require('serverless/binary').getBinary().binaryPath;
             const args = [...(values.auth ? ['--config', 'serverless-auth.yml'] : []), '--stage', 'dev', '--region', region, `--param=suffix=${suffix}`, `--param=contentBucket=${report.contentBucket}`, `--param=deploymentBucket=${report.deploymentBucket}`, ...(values.auth ? [`--param=authDomain=classify-fixture-${createHash('sha256').update(service).digest('hex').slice(0,24)}`] : []), ...(process.env.AWS_PROFILE ? ['--aws-profile', process.env.AWS_PROFILE] : [])];
             const packageDir = join(reportDir, 'package');
@@ -221,6 +228,10 @@ async function main() {
                 if (!statements.some(s => [].concat(s.Action || []).includes(action))) throw new Error(`Generated IAM is missing ${action}`);
             }
             report.checks.generatedIam = 'passed';
+            if (values['static-pages']) {
+                require('./static-pages-test').assertStaticTemplate(template, !!values.auth);
+                report.checks.staticPagesTemplate = 'passed'; save();
+            }
             report.stackOwned = true; save(); // absent before our deploy; partial creation also belongs to this run
             await command('deploy', binary, ['deploy', ...args, '--package', packageDir], fixtureDir);
             const deployed = await stack();
@@ -243,6 +254,12 @@ async function main() {
                 } catch (e) { if (controller.signal.aborted) throw e; }
                 if (Date.now() >= deadline) throw new Error('Uploaded static fixture was not served by CloudFront');
                 await delay(2000);
+            }
+            if (values['static-pages']) {
+                const {publishFromStack} = require('../../aws-classify-tools/lib/core.cjs');
+                await publishFromStack({config: join(fixtureDir, values.auth ? 'serverless-auth.yml' : 'serverless.yml'), stage: 'dev', source: resolve(values['static-pages']), region});
+                report.checks.staticPages = await require('./static-pages-test').verifyStaticWebsite({website, source: resolve(values['static-pages']), signal: controller.signal});
+                save();
             }
             if (values.auth) {
                 const {buildSync} = require('esbuild');

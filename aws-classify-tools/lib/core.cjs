@@ -106,7 +106,13 @@ async function emptyBucket(bucket, {region, s3 = new S3Client({region})} = {}) {
         }
     }
 }
-async function publishSite({source, bucket, distributionId, region, s3 = new S3Client({region}), cloudfront = new CloudFrontClient({region})}) {
+function spaDirectoryFromPackage(filename) {
+    const directory = JSON.parse(readFileSync(filename, 'utf8')).awsClassify?.spaDirectory;
+    if (directory !== undefined && (typeof directory !== 'string' || !/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(directory) || directory.split('/')[0] === 'api'))
+        throw new Error('awsClassify.spaDirectory must be a relative directory such as "app", outside api/.');
+    return directory;
+}
+async function publishSite({source, bucket, distributionId, region, spaDirectory, s3 = new S3Client({region}), cloudfront = new CloudFrontClient({region})}) {
     const {directory, files} = sourceFiles(source);
     const previous = new Set(await listKeys(s3, bucket));
     const current = new Set();
@@ -114,7 +120,8 @@ async function publishSite({source, bucket, distributionId, region, s3 = new S3C
         const key = relative(directory, file).split('\\').join('/'); current.add(key);
         await s3.send(new PutObjectCommand({Bucket: bucket, Key: key, Body: readFileSync(file),
             ContentType: mime.lookup(file) || 'application/octet-stream',
-            CacheControl: key.startsWith('assets/') ? 'public, max-age=31536000, immutable' : 'no-cache'}));
+            CacheControl: !/\.html?$/i.test(key) && (key.startsWith('assets/') || (spaDirectory && key.startsWith(`${spaDirectory}/assets/`)))
+                ? 'public, max-age=31536000, immutable' : 'no-cache'}));
     }
     const stale = [...previous].filter(key => !current.has(key));
     for (let start = 0; start < stale.length; start += 1000) {
@@ -136,7 +143,9 @@ async function publishFromStack({config, stage, source, output, region}) {
     const bucket = stack.outputs.ContentBucket;
     const distributionId = stack.outputs.CloudFrontId;
     if (!bucket || !distributionId) throw new Error(`${stack.name} must output ContentBucket and CloudFrontId.`);
-    const result = await publishSite({source, bucket, distributionId, region: stack.region});
+    const rootPackage = join(stack.resolved.cwd, '..', 'package.json');
+    const spaDirectory = existsSync(rootPackage) ? spaDirectoryFromPackage(rootPackage) : undefined;
+    const result = await publishSite({source, bucket, distributionId, region: stack.region, spaDirectory});
     output ||= join(stack.resolved.cwd, 'output.json');
     writeStackOutputs(output, stack.outputs);
     return {...result, ...stack, bucket, distributionId, output: resolve(output)};
@@ -230,4 +239,4 @@ async function runExpo({project, cloudOutput, localApi, expoArgs}) {
     return new Promise((resolveExit, reject) => child.once('error', reject).once('exit', code => code === 0 ? resolveExit() : reject(new Error(`Expo exited (${code}).`))));
 }
 
-module.exports = {emptyBucket, initializeLocalDb, localDynamoEndpoint, publishFromStack, publishSite, resolvedConfig, runExpo, runOffline, runServerless, stackName, stackOutputs, stackOutputValues, writeStackOutputs};
+module.exports = {emptyBucket, initializeLocalDb, localDynamoEndpoint, publishFromStack, publishSite, resolvedConfig, runExpo, runOffline, runServerless, spaDirectoryFromPackage, stackName, stackOutputs, stackOutputValues, writeStackOutputs};

@@ -146,6 +146,10 @@ do not share a table. The supplied DynamoDB IAM include grants access to all
 tables; production services can narrow it to their session-table ARN as described
 in the [configuration reference](../reference/serverless.md).
 
+For a public homepage alongside a SPA under `/app`, see
+[static public pages](../guides/static-pages.md) for the optional include and
+combined build/publication directory.
+
 ## Remove a development deployment
 
 Use the matching remove command, which empties the content bucket it discovers

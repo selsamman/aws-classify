@@ -127,7 +127,7 @@ async function runAuthentication({outputs: o, region, signal, log, onCheck = () 
             });
             await test(`${label}: legacy fixture management interface is not exposed`, async () => {
                 const r=await fetch(api,{method:'POST',headers:{'Content-Type':'text/plain',Authorization:`Bearer ${a()}`},body:serialize({interfaceName:'ServerRequest',methodName:'sendCountTo',sessionId:session,args:[session]}),signal:AbortSignal.any([signal,AbortSignal.timeout(15000)])});
-                assert.equal(r.status,200); assert.match(deserialize(await r.text()).exception,/No Response defined/);
+                assert.equal(r.status,200); assert.equal(deserialize(await r.text()).exception,'Internal Server Error');
                 assert.equal((await ok(api,'getValue',a(),session)).data,7);
             });
             await test(`${label}: scope policy denies without mutation`, async () => {

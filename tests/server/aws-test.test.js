@@ -53,6 +53,21 @@ test('prepares separate Serverless build directories with bounded fixture names'
         assert.match(functions,/authentication-config.js\):authorizer/);
     } finally {rmSync(dir,{recursive:true,force:true});}
 });
+test('static-page fixtures opt in after the website include and share the publisher setting', () => {
+    const {mkdtempSync, rmSync, readFileSync} = require('node:fs');
+    const {tmpdir} = require('node:os');
+    const {join} = require('node:path');
+    const {prepareFixture} = require('./aws-test');
+    const directory = mkdtempSync(join(tmpdir(), 'classify-static-fixture-'));
+    try {
+        const fixture = prepareFixture(directory, true);
+        for (const filename of ['serverless.yml', 'serverless-auth.yml']) {
+            const config = readFileSync(join(fixture, filename), 'utf8');
+            assert.match(config, /resources-website(?:-authenticated)?\.yml\)\}\n  - \$\{file\(\$\{self:custom.yml\}\/resources-static-pages.yml\)\}/);
+        }
+        assert.equal(JSON.parse(readFileSync(join(directory, 'package.json'))).awsClassify.spaDirectory, 'app');
+    } finally {rmSync(directory, {recursive: true, force: true});}
+});
 test('loads YAML coverage configuration with the audited YAML parser override', async () => {
     const {mkdtempSync,writeFileSync,rmSync}=require('node:fs');
     const {tmpdir}=require('node:os');const {join}=require('node:path');

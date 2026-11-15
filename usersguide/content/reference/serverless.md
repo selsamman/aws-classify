@@ -35,6 +35,7 @@ character requirements. The starter app includes stage/account in its bucket nam
 | `resources-website.yml` | Default CloudFront hostname and S3 website for unauthenticated mode |
 | `resources-website-authenticated.yml` | Default-hostname hosting with Authorization forwarding, no API caching and preserved 403 errors |
 | `resources-custom-website.yml` | Existing unauthenticated custom-domain hosting with ACM/Route 53 |
+| `resources-static-pages.yml` | Optional static public pages and configured SPA entry; include after a website template, see [recipe](../guides/static-pages.md) |
 | `custom-cloudfront.yml` | Invalidation settings for consumers using a compatible invalidation plugin; not an upload/build command |
 
 The session table uses `sessionId` as its partition key and `expires` for TTL.

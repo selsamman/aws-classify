@@ -31,6 +31,7 @@
     "release:publish": "node scripts/release-publish.cjs",
     "test:release": "node --test tests/release.test.cjs",
     "test:tools": "npm test --workspace aws-classify-tools",
+    "test:static-pages:recipe": "node tests/static-pages-recipe.cjs",
     "guide:install": "npm --prefix usersguide ci --workspaces=false",
     "guide:dev": "npm --prefix usersguide start",
     "guide:build": "npm --prefix usersguide run build",

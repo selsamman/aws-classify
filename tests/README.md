@@ -99,6 +99,27 @@ npm run test:aws -- --suffix sam --profile review --region us-east-1
 
 This requires working AWS credentials and the normal Serverless 4 sign-in.
 The AWS CLI is not required: the runner uses the AWS SDK's credential chain.
+To validate the optional public-pages include with an actual Vite/Minista build,
+use Node 22.12 or later and run:
+
+```sh
+npm run test:static-pages:recipe
+# Use the site-dist path printed by that command:
+npm run test:aws -- --suffix static --static-pages /absolute/path/to/fixture/site-dist
+npm run test:aws -- --auth --suffix staticauth --static-pages /absolute/path/to/fixture/site-dist
+```
+
+The recipe check extracts the guide's code blocks, installs its dependencies in
+an isolated workspace under `.test-results/static-pages-recipe/`, builds both
+sites, typechecks the public pages, and checks complete documents, shared layouts,
+page metadata and asset URLs. It keeps the fixture, lockfile and verification
+report for inspection. The AWS option uses `app` as the fixture SPA directory;
+it checks packaged CloudFormation and publishes the combined output through the
+real publisher. CloudFront checks cover both SPA entry forms, callback queries,
+public pages, JS/CSS cache headers, missing files, unchanged deep links and API
+isolation. The normal legacy or authenticated API suites still run. Cleanup uses
+the same owned-resource guards and recovery manifest as other AWS tests.
+
 `--suffix` accepts a 1–10 character lowercase prefix starting with a letter.
 Every run adds a timestamp and random component, producing a service such as
 `aws-classify-tests-sam-<run-id>`. Concurrent reviewers can use the same profile

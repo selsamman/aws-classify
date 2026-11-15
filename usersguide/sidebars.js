@@ -3,6 +3,7 @@ export default {
     'intro',
     {type: 'category', label: 'Start a project', items: [
       'getting-started/project-layout',
+      'getting-started/web-client',
       'getting-started/first-call',
       'getting-started/deployment',
       'getting-started/local-development',
@@ -12,6 +13,7 @@ export default {
       'guides/authentication',
       'guides/mobile',
       'guides/custom-domain',
+      'guides/static-pages',
     ]},
     {type: 'category', label: 'Advanced configuration', items: ['existing-projects']},
     'examples',
