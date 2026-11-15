@@ -1,0 +1,42 @@
+# Include AFTER a resources-website*.yml template. Only the static behavior changes.
+Resources:
+  AWSClassifySpaEntry:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: ${self:service}-${sls:stage}-spa-entry
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Rewrite the configured SPA entry directory to its index document
+        Runtime: cloudfront-js-2.0
+      FunctionCode: ${file(${self:custom.yml}/static-pages-config.js):functionCode}
+  AWSClassifyStaticCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: ${self:service}-${sls:stage}-static-pages
+        MinTTL: 0
+        DefaultTTL: 0
+        MaxTTL: 31536000
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+  CloudFrontDistribution:
+    Properties:
+      DistributionConfig:
+        DefaultCacheBehavior:
+          CachePolicyId: !Ref AWSClassifyStaticCachePolicy
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt AWSClassifySpaEntry.FunctionARN
+        # Missing public files and API errors must not become the public homepage.
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ErrorCachingMinTTL: 0
+            ResponseCode: !Ref AWS::NoValue
+            ResponsePagePath: !Ref AWS::NoValue
